@@ -1,0 +1,10 @@
+# Dependencies & Compilers
+node_modules/
+emsdk/
+
+# Build outputs
+dist/
+.vscode/
+
+# Keep source files in public, but ignore local debug artifacts if any
+*.log

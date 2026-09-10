@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Minecraft Seed Map</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #111; color: #eee; }
+    body { display: flex; flex-direction: column; }
+    
+    #toolbar {
+      min-height: 48px;
+      padding: 6px 16px;
+      background: #1e1e1e;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      z-index: 100;
+      border-bottom: 1px solid #333;
+      flex-wrap: wrap;
+    }
+    #toolbar input, #toolbar select, #toolbar button {
+      padding: 6px 10px;
+      border-radius: 4px;
+      border: 1px solid #444;
+      background: #2b2b2b;
+      color: #fff;
+      font-size: 13px;
+    }
+    .coord-input { width: 80px; }
+    #renderBtn { background: #238636; border-color: #2ea043; font-weight: bold; cursor: pointer; }
+    #renderBtn:hover { background: #2ea043; }
+    #gotoBtn { background: #1f6feb; border-color: #388bfd; font-weight: bold; cursor: pointer; }
+    #gotoBtn:hover { background: #388bfd; }
+    #clearPinBtn { background: #444; border-color: #555; cursor: pointer; }
+
+    .separator { width: 1px; height: 24px; background: #444; margin: 0 4px; }
+
+    #container {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      touch-action: none;
+    }
+    #container:active { cursor: grabbing; }
+
+    #viewport {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    #info-bar {
+      position: absolute;
+      bottom: 14px;
+      left: 75px;
+      background: rgba(15, 15, 15, 0.88);
+      backdrop-filter: blur(4px);
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid #3a3a3a;
+      font-family: monospace;
+      font-size: 13px;
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      gap: 14px;
+      align-items: center;
+    }
+    #biome-tag {
+      color: #58a6ff;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="toolbar">
+    <label>Seed: <input type="text" id="seedInput" value="-7537587231326715432" /></label>
+    
+    <label>Version:
+      <select id="versionSelect">
+        <optgroup label="Bedrock Edition">
+          <option value="be_1_21" selected>Bedrock 1.21.60 - 1.21.84</option>
+          <option value="be_1_20">Bedrock 1.20</option>
+          <option value="be_1_19">Bedrock 1.19</option>
+          <option value="be_1_18">Bedrock 1.18</option>
+        </optgroup>
+        <optgroup label="Java Edition">
+          <option value="java_1_21">Java 1.21</option>
+          <option value="java_1_20">Java 1.20</option>
+          <option value="java_1_19">Java 1.19</option>
+          <option value="java_1_18">Java 1.18</option>
+        </optgroup>
+      </select>
+    </label>
+
+    <label>Dimension: 
+      <select id="dimensionSelect">
+        <option value="0" selected>Overworld</option>
+        <option value="-1">Nether</option>
+        <option value="1">End</option>
+      </select>
+    </label>
+
+    <label>Height:
+      <select id="heightSelect">
+        <option value="320" selected>Surface</option>
+        <option value="64">Sea Level (Y 64)</option>
+        <option value="0">Underground (Y 0)</option>
+        <option value="-51">Bottom (Y -51)</option>
+      </select>
+    </label>
+
+    <button id="renderBtn">Render</button>
+
+    <div class="separator"></div>
+
+    <label>X: <input type="number" id="gotoX" class="coord-input" placeholder="0" /></label>
+    <label>Z: <input type="number" id="gotoZ" class="coord-input" placeholder="0" /></label>
+    <button id="gotoBtn">Go!</button>
+    <button id="clearPinBtn">Clear</button>
+  </div>
+
+  <div id="container">
+    <canvas id="viewport"></canvas>
+    <div id="info-bar">
+      <span id="coords-display">X: 0 | Z: 0</span>
+      <span id="biome-tag">Ocean</span>
+    </div>
+  </div>
+
+  <script src="/cubiomes.js"></script>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
