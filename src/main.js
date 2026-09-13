@@ -1,22 +1,147 @@
-import { getBiomeColor, getBiomeName } from './biomes.js';
+import { getBiomeColor, getBiomeName, BIOME_COLOR_LUT } from './biomes.js';
+import { loadPoiImages, drawPoiMarker, PANEL_SPRITES } from './poi-sprites.js';
+import { STRUCTURE_DEFS, getVisibleStructures, ensureStructuresLoaded, initStructureWorker } from './structures.js';
 
 let cubiomesModule = null;
 let sharedBufferPtr = 0;
 let currentSeed = -7537587231326715432n;
 let currentDim = 0;
-let selectedVersion = '1_21';
-let selectedY = 320;
+let selectedVersion = 'be_26_30';
+let selectedY = 319;
 
-// Exact enum indexes directly verified against cubiomes/biomes.h
+// Structure & Feature State
+const enabledStructures = {
+  '-1': new Set((STRUCTURE_DEFS['-1'] || []).filter(d => d.defaultEnabled).map(d => d.id)),
+  '0':  new Set((STRUCTURE_DEFS['0'] || []).filter(d => d.defaultEnabled).map(d => d.id)),
+  '1':  new Set((STRUCTURE_DEFS['1'] || []).filter(d => d.defaultEnabled).map(d => d.id))
+};
+
+const STORAGE_KEY = 'minecraftable_completed_locations';
+let completedLocations = new Set();
+try {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    completedLocations = new Set(JSON.parse(saved));
+  }
+} catch (_) {}
+
+function saveCompletedLocations() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(completedLocations)));
+  } catch (_) {}
+}
+
+function getCompletionKey(marker) {
+  return `${currentSeed}_${currentDim}_${marker.type}_${marker.x}_${marker.z}`;
+}
+
+let currentVisibleMarkers = [];
+let hoveredMarker = null;
+let activePopupMarker = null;
+
+// Exact enum indexes and flags directly verified against cubiomes biomes.h & generator.c
 const VERSION_MAP = {
-  '1_21': 28, // MC_1_21 / MC_NEWEST
-  '1_20': 25, // MC_1_20_6
-  '1_19': 24, // MC_1_19_4
-  '1_18': 22  // MC_1_18_2
+  // Bedrock Edition (latest at top)
+  'be_26_30':    { mc: 28, flags: 0, isBedrock: true },
+  'be_26_0':     { mc: 28, flags: 0, isBedrock: true },
+  'be_1_21_120': { mc: 28, flags: 0, isBedrock: true },
+  'be_1_21_110': { mc: 28, flags: 0, isBedrock: true },
+  'be_1_21_90':  { mc: 28, flags: 0, isBedrock: true },
+  'be_1_21_60':  { mc: 28, flags: 0, isBedrock: true },
+  'be_1_21_50':  { mc: 28, flags: 0, isBedrock: true },
+  'be_1_21':     { mc: 26, flags: 0, isBedrock: true },
+  'be_1_20_60':  { mc: 25, flags: 0, isBedrock: true },
+  'be_1_20':     { mc: 25, flags: 0, isBedrock: true },
+  'be_1_19':     { mc: 24, flags: 0, isBedrock: true },
+  'be_1_18':     { mc: 22, flags: 0, isBedrock: true },
+  'be_1_17':     { mc: 21, flags: 0, isBedrock: true },
+  'be_1_16':     { mc: 20, flags: 0, isBedrock: true },
+  'be_1_14':     { mc: 17, flags: 0, isBedrock: true },
+
+  // Java Edition (latest at top)
+  'java_26_2':    { mc: 28, flags: 0, isBedrock: false },
+  'java_26_1':    { mc: 28, flags: 0, isBedrock: false },
+  'java_1_21_9':   { mc: 28, flags: 0, isBedrock: false },
+  'java_1_21_6':   { mc: 28, flags: 0, isBedrock: false },
+  'java_1_21_5':   { mc: 28, flags: 0, isBedrock: false },
+  'java_1_21_4':   { mc: 28, flags: 0, isBedrock: false },
+  'java_1_21_2':   { mc: 27, flags: 0, isBedrock: false },
+  'java_1_21':     { mc: 26, flags: 0, isBedrock: false },
+  'java_1_20':     { mc: 25, flags: 0, isBedrock: false },
+  'java_1_19_4':   { mc: 24, flags: 0, isBedrock: false },
+  'java_1_19':     { mc: 23, flags: 0, isBedrock: false },
+  'java_1_18':     { mc: 22, flags: 0, isBedrock: false },
+  'java_1_17':     { mc: 21, flags: 0, isBedrock: false },
+  'java_1_16':     { mc: 20, flags: 0, isBedrock: false },
+  'java_1_15':     { mc: 18, flags: 0, isBedrock: false },
+  'java_1_14':     { mc: 17, flags: 0, isBedrock: false },
+  'java_1_13':     { mc: 16, flags: 0, isBedrock: false },
+  'java_1_12':     { mc: 15, flags: 0, isBedrock: false },
+  'java_1_11':     { mc: 14, flags: 0, isBedrock: false },
+  'java_1_10':     { mc: 13, flags: 0, isBedrock: false },
+  'java_1_9':      { mc: 12, flags: 0, isBedrock: false },
+  'java_1_8':      { mc: 11, flags: 0, isBedrock: false },
+  'java_1_7':      { mc: 10, flags: 0, isBedrock: false },
+  'java_1_6':      { mc: 9,  flags: 0, isBedrock: false },
+  'java_1_5':      { mc: 8,  flags: 0, isBedrock: false },
+  'java_1_4':      { mc: 7,  flags: 0, isBedrock: false },
+  'java_1_3':      { mc: 6,  flags: 0, isBedrock: false },
+  'java_1_2':      { mc: 5,  flags: 0, isBedrock: false },
+  'java_1_1':      { mc: 4,  flags: 0, isBedrock: false },
+  'java_1_0':      { mc: 3,  flags: 0, isBedrock: false },
+  'java_b1_8':     { mc: 2,  flags: 0, isBedrock: false },
+  'java_b1_7':     { mc: 1,  flags: 0, isBedrock: false },
+
+  // Java Edition - Large Biomes (flags: 1)
+  'java_26_2_lb':    { mc: 28, flags: 1, isBedrock: false },
+  'java_26_1_lb':    { mc: 28, flags: 1, isBedrock: false },
+  'java_1_21_9_lb':   { mc: 28, flags: 1, isBedrock: false },
+  'java_1_21_6_lb':   { mc: 28, flags: 1, isBedrock: false },
+  'java_1_21_5_lb':   { mc: 28, flags: 1, isBedrock: false },
+  'java_1_21_4_lb':   { mc: 28, flags: 1, isBedrock: false },
+  'java_1_21_2_lb':   { mc: 27, flags: 1, isBedrock: false },
+  'java_1_21_lb':     { mc: 26, flags: 1, isBedrock: false },
+  'java_1_20_lb':     { mc: 25, flags: 1, isBedrock: false },
+  'java_1_19_4_lb':   { mc: 24, flags: 1, isBedrock: false },
+  'java_1_19_lb':     { mc: 23, flags: 1, isBedrock: false },
+  'java_1_18_lb':     { mc: 22, flags: 1, isBedrock: false },
+  'java_1_17_lb':     { mc: 21, flags: 1, isBedrock: false },
+  'java_1_16_lb':     { mc: 20, flags: 1, isBedrock: false },
+  'java_1_15_lb':     { mc: 18, flags: 1, isBedrock: false },
+  'java_1_14_lb':     { mc: 17, flags: 1, isBedrock: false },
+  'java_1_13_lb':     { mc: 16, flags: 1, isBedrock: false },
+  'java_1_12_lb':     { mc: 15, flags: 1, isBedrock: false },
+  'java_1_11_lb':     { mc: 14, flags: 1, isBedrock: false },
+  'java_1_10_lb':     { mc: 13, flags: 1, isBedrock: false },
+  'java_1_9_lb':      { mc: 12, flags: 1, isBedrock: false },
+  'java_1_8_lb':      { mc: 11, flags: 1, isBedrock: false },
+  'java_1_7_lb':      { mc: 10, flags: 1, isBedrock: false }
 };
 
 const TILE_PIXELS = 256; 
-const BLOCKS_PER_TILE = 1024; 
+const PREVIEW_PIXELS = 64;
+
+// Multi-Scale Level of Detail (LOD)
+// At 256x256 pixels:
+// - LOD 0: scale 4 (1 quart/px)   -> 1024 blocks/tile (highest detail)
+// - LOD 1: scale 16 (4 quarts/px) -> 4096 blocks/tile
+// - LOD 2: scale 64 (16 quarts/px)-> 16384 blocks/tile
+// - LOD 3: scale 256 (64 quarts/px)-> 65536 blocks/tile (ultra-fast 100,000 block overview)
+const LOD_LEVELS = [
+  { lod: 0, scale: 4,   blocksPerTile: 1024,  minPxPerBlock: 0.2 },
+  { lod: 1, scale: 16,  blocksPerTile: 4096,  minPxPerBlock: 0.05 },
+  { lod: 2, scale: 64,  blocksPerTile: 16384, minPxPerBlock: 0.02 },
+  { lod: 3, scale: 256, blocksPerTile: 65536, minPxPerBlock: 0 }
+];
+
+function getActiveLOD() {
+  const pxPerBlock = camera.zoom / 4;
+  for (const level of LOD_LEVELS) {
+    if (pxPerBlock >= level.minPxPerBlock) return level;
+  }
+  return LOD_LEVELS[LOD_LEVELS.length - 1];
+}
+
 const tileCache = new Map();
 
 let targetPin = null;
@@ -35,9 +160,272 @@ const ctx = canvas.getContext('2d');
 const coordsDisplay = document.getElementById('coords-display');
 const biomeTag = document.getElementById('biome-tag');
 
+const markerPopup = document.getElementById('markerPopup');
+const popupTitle = document.getElementById('popupTitle');
+const popupCoords = document.getElementById('popupCoords');
+const popupCopyBtn = document.getElementById('popupCopyBtn');
+const popupShareBtn = document.getElementById('popupShareBtn');
+const copyToast = document.getElementById('copyToast');
+const popupCompleteBtn = document.getElementById('popupCompleteBtn');
+const completeIcon = document.getElementById('completeIcon');
+const completeText = document.getElementById('completeText');
+
+const featuresPanel = document.getElementById('featuresPanel');
+const featuresToggleBtn = document.getElementById('featuresToggleBtn');
+const featuresCloseBtn = document.getElementById('featuresCloseBtn');
+const featuresCountBadge = document.getElementById('featuresCountBadge');
+const selectAllBtn = document.getElementById('selectAllBtn');
+const deselectAllBtn = document.getElementById('deselectAllBtn');
+const featuresList = document.getElementById('featuresList');
+
+function updatePopupCompleteState(marker) {
+  if (!marker || !popupCompleteBtn) return;
+  const compKey = getCompletionKey(marker);
+  const isComp = completedLocations.has(compKey);
+  if (isComp) {
+    popupCompleteBtn.classList.add('completed');
+    if (completeIcon) completeIcon.textContent = '✓';
+    if (completeText) completeText.textContent = 'Completed';
+  } else {
+    popupCompleteBtn.classList.remove('completed');
+    if (completeIcon) completeIcon.textContent = '☐';
+    if (completeText) completeText.textContent = 'Completed';
+  }
+}
+
+function openMarkerPopup(marker, screenX, screenY) {
+  if (!markerPopup) return;
+  activePopupMarker = marker;
+
+  if (popupTitle) {
+    popupTitle.textContent = marker.name || marker.baseName || 'Structure';
+  }
+  if (popupCoords) {
+    const yStr = marker.y != null ? ` Y: ${marker.y}` : '';
+    popupCoords.textContent = `X: ${marker.x}${yStr} Z: ${marker.z}`;
+  }
+
+  updatePopupCompleteState(marker);
+
+  if (copyToast) copyToast.classList.add('hidden');
+
+  positionMarkerPopup(screenX, screenY);
+  markerPopup.classList.remove('hidden');
+}
+
+function positionMarkerPopup(screenX, screenY) {
+  if (!markerPopup) return;
+  const isFlipped = (screenY < 110);
+  if (isFlipped) {
+    markerPopup.classList.add('flipped');
+    markerPopup.style.top = `${Math.round(screenY)}px`;
+  } else {
+    markerPopup.classList.remove('flipped');
+    markerPopup.style.top = `${Math.round(screenY - 18)}px`;
+  }
+  markerPopup.style.left = `${Math.round(screenX)}px`;
+}
+
+function closeMarkerPopup() {
+  activePopupMarker = null;
+  if (markerPopup) markerPopup.classList.add('hidden');
+  if (copyToast) copyToast.classList.add('hidden');
+}
+
+function updateFeaturesBadge() {
+  if (!featuresCountBadge) return;
+  const dimStr = String(currentDim);
+  const set = enabledStructures[dimStr] || new Set();
+  featuresCountBadge.textContent = String(set.size);
+}
+
+function renderFeaturesPanel() {
+  if (!featuresList) return;
+  featuresList.innerHTML = '';
+
+  const dimStr = String(currentDim);
+  const defs = STRUCTURE_DEFS[dimStr] || [];
+  const enabledSet = enabledStructures[dimStr] || new Set();
+
+  defs.forEach((def) => {
+    const item = document.createElement('div');
+    item.className = 'feature-item';
+
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'feature-icon-thumb';
+    const spr = PANEL_SPRITES[def.icon];
+    if (spr) {
+      iconDiv.style.backgroundPosition = `-${spr.x}px -${spr.y}px`;
+    }
+
+    const label = document.createElement('span');
+    label.className = 'feature-label';
+    label.textContent = def.name;
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'feature-checkbox';
+    checkbox.checked = enabledSet.has(def.id);
+
+    const setEnabled = (enabled) => {
+      if (enabled) {
+        enabledSet.add(def.id);
+        checkbox.checked = true;
+      } else {
+        enabledSet.delete(def.id);
+        checkbox.checked = false;
+      }
+      updateFeaturesBadge();
+      renderView();
+    };
+
+    item.addEventListener('click', (e) => {
+      if (e.target === checkbox) return;
+      setEnabled(!enabledSet.has(def.id));
+    });
+
+    checkbox.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setEnabled(checkbox.checked);
+    });
+
+    checkbox.addEventListener('change', (e) => {
+      e.stopPropagation();
+      setEnabled(checkbox.checked);
+    });
+
+    item.appendChild(iconDiv);
+    item.appendChild(label);
+    item.appendChild(checkbox);
+    featuresList.appendChild(item);
+  });
+
+  updateFeaturesBadge();
+}
+
+if (featuresToggleBtn && featuresPanel) {
+  featuresToggleBtn.addEventListener('click', () => {
+    featuresPanel.classList.toggle('open');
+  });
+}
+
+if (featuresCloseBtn && featuresPanel) {
+  featuresCloseBtn.addEventListener('click', () => {
+    featuresPanel.classList.remove('open');
+  });
+}
+
+if (selectAllBtn) {
+  selectAllBtn.addEventListener('click', () => {
+    const dimStr = String(currentDim);
+    const defs = STRUCTURE_DEFS[dimStr] || [];
+    const enabledSet = enabledStructures[dimStr] || new Set();
+    defs.forEach(d => enabledSet.add(d.id));
+    renderFeaturesPanel();
+    renderView();
+  });
+}
+
+if (deselectAllBtn) {
+  deselectAllBtn.addEventListener('click', () => {
+    const dimStr = String(currentDim);
+    const enabledSet = enabledStructures[dimStr] || new Set();
+    enabledSet.clear();
+    renderFeaturesPanel();
+    renderView();
+  });
+}
+
+if (markerPopup) {
+  markerPopup.addEventListener('mousedown', (e) => e.stopPropagation());
+  markerPopup.addEventListener('click', (e) => e.stopPropagation());
+}
+
+if (popupCopyBtn) {
+  popupCopyBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (!activePopupMarker) return;
+    const yStr = activePopupMarker.y != null ? ` Y: ${activePopupMarker.y}` : '';
+    const text = `X: ${activePopupMarker.x}${yStr} Z: ${activePopupMarker.z}`;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      }
+    } catch (_) {}
+    if (copyToast) {
+      copyToast.textContent = 'Copied!';
+      copyToast.classList.remove('hidden');
+      setTimeout(() => {
+        if (copyToast) copyToast.classList.add('hidden');
+      }, 1500);
+    }
+  });
+}
+
+if (popupShareBtn) {
+  popupShareBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!activePopupMarker) return;
+    const yStr = activePopupMarker.y != null ? ` Y: ${activePopupMarker.y}` : '';
+    const text = `${activePopupMarker.name || activePopupMarker.baseName} at X: ${activePopupMarker.x}${yStr} Z: ${activePopupMarker.z} (Seed: ${currentSeed})`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text);
+    }
+    if (copyToast) {
+      copyToast.textContent = 'Link copied!';
+      copyToast.classList.remove('hidden');
+      setTimeout(() => {
+        if (copyToast) {
+          copyToast.textContent = 'Copied!';
+          copyToast.classList.add('hidden');
+        }
+      }, 1500);
+    }
+  });
+}
+
+if (popupCompleteBtn) {
+  popupCompleteBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!activePopupMarker) return;
+    const compKey = getCompletionKey(activePopupMarker);
+    if (completedLocations.has(compKey)) {
+      completedLocations.delete(compKey);
+    } else {
+      completedLocations.add(compKey);
+    }
+    saveCompletedLocations();
+    updatePopupCompleteState(activePopupMarker);
+    requestRender();
+  });
+}
+
+
 let dpr = window.devicePixelRatio || 1;
 let cssWidth = 0;
 let cssHeight = 0;
+
+function getZoomLimits() {
+  const w = cssWidth || (canvas && canvas.parentElement ? canvas.parentElement.clientWidth : 1600) || 1600;
+  return {
+    maxZoom: 4 * (w / 100),       // 100 blocks across X (~60 blocks in Z on 16:9)
+    minZoom: 4 * (w / 100000)     // 100,000 blocks across X
+  };
+}
+
+// Render-on-demand & progressive queue state
+let renderRafId = null;
+let debounceTimer = null;
+let isQueueProcessing = false;
+let pendingTiles = [];
+
+function requestRender() {
+  if (renderRafId) return;
+  renderRafId = requestAnimationFrame(() => {
+    renderRafId = null;
+    renderView();
+  });
+}
 
 function resizeCanvas() {
   dpr = window.devicePixelRatio || 1;
@@ -47,22 +435,80 @@ function resizeCanvas() {
   canvas.width = Math.round(cssWidth * dpr);
   canvas.height = Math.round(cssHeight * dpr);
 
-  renderView();
+  const { minZoom, maxZoom } = getZoomLimits();
+  camera.zoom = Math.min(Math.max(camera.zoom, minZoom), maxZoom);
+
+  requestRender();
+  scheduleTileGeneration(true);
 }
 window.addEventListener('resize', resizeCanvas);
 
 function setInitial3000BlockView() {
   cssWidth = canvas.parentElement.clientWidth;
   if (!cssWidth) return;
-  camera.zoom = (4 * (cssWidth / 2)) / 3000;
-  renderView();
+  const { minZoom, maxZoom } = getZoomLimits();
+  const targetZoom = (4 * cssWidth) / 3000;
+  camera.zoom = Math.min(Math.max(targetZoom, minZoom), maxZoom);
+  requestRender();
 }
 
-function getTile(tx, tz) {
-  const key = `${tx},${tz},${currentSeed},${currentDim},${selectedVersion},${selectedY}`;
-  if (tileCache.has(key)) {
-    return tileCache.get(key);
+function generatePreviewTile(tx, tz, lodLevel) {
+  const { lod } = lodLevel;
+  const key = `${lod},${tx},${tz},${currentSeed},${currentDim},${selectedVersion},${selectedY}`;
+  const existing = tileCache.get(key);
+  if (existing) return;
+
+  if (!cubiomesModule || !sharedBufferPtr) return;
+
+  const offscreen = document.createElement('canvas');
+  offscreen.width = PREVIEW_PIXELS;
+  offscreen.height = PREVIEW_PIXELS;
+  const offCtx = offscreen.getContext('2d');
+  const imgData = offCtx.createImageData(PREVIEW_PIXELS, PREVIEW_PIXELS);
+  const buf32 = new Uint32Array(imgData.data.buffer);
+
+  // At scale 16, 64x64 samples cover 1024 blocks (LOD 0 tile size)
+  const cellX = tx * PREVIEW_PIXELS;
+  const cellZ = tz * PREVIEW_PIXELS;
+
+  try {
+    cubiomesModule._get_biome_area(sharedBufferPtr, cellX, cellZ, PREVIEW_PIXELS, PREVIEW_PIXELS, 16, selectedY);
+
+    const heap32 = cubiomesModule.HEAP32;
+    const totalPixels = PREVIEW_PIXELS * PREVIEW_PIXELS;
+
+    if (heap32) {
+      const offset = sharedBufferPtr >> 2;
+      for (let i = 0; i < totalPixels; i++) {
+        const biomeId = heap32[offset + i];
+        buf32[i] = (biomeId >= 0 && biomeId < 256) ? BIOME_COLOR_LUT[biomeId] : 0xff404040;
+      }
+    } else {
+      for (let i = 0; i < totalPixels; i++) {
+        const biomeId = cubiomesModule.getValue(sharedBufferPtr + (i * 4), 'i32');
+        buf32[i] = (biomeId >= 0 && biomeId < 256) ? BIOME_COLOR_LUT[biomeId] : 0xff404040;
+      }
+    }
+
+    offCtx.putImageData(imgData, 0, 0);
+
+    tileCache.set(key, {
+      canvas: offscreen,
+      isHiRes: false,
+      loadedAt: performance.now()
+    });
+  } catch (err) {
+    console.error(`Preview tile error [LOD ${lod}, ${tx}, ${tz}]:`, err);
   }
+}
+
+function generateHiResTile(tx, tz, lodLevel) {
+  const { lod, scale } = lodLevel;
+  const key = `${lod},${tx},${tz},${currentSeed},${currentDim},${selectedVersion},${selectedY}`;
+  const existing = tileCache.get(key);
+  if (existing && existing.isHiRes) return;
+
+  if (!cubiomesModule || !sharedBufferPtr) return;
 
   const offscreen = document.createElement('canvas');
   offscreen.width = TILE_PIXELS;
@@ -71,32 +517,157 @@ function getTile(tx, tz) {
   const imgData = offCtx.createImageData(TILE_PIXELS, TILE_PIXELS);
   const buf32 = new Uint32Array(imgData.data.buffer);
 
-  if (!cubiomesModule || !sharedBufferPtr) return offscreen;
-
-  const quartX = tx * TILE_PIXELS;
-  const quartZ = tz * TILE_PIXELS;
+  const rX = tx * TILE_PIXELS;
+  const rZ = tz * TILE_PIXELS;
 
   try {
-    cubiomesModule._get_biome_area(sharedBufferPtr, quartX, quartZ, TILE_PIXELS, TILE_PIXELS, 4, selectedY);
+    cubiomesModule._get_biome_area(sharedBufferPtr, rX, rZ, TILE_PIXELS, TILE_PIXELS, scale, selectedY);
 
-    for (let i = 0; i < TILE_PIXELS * TILE_PIXELS; i++) {
-      const biomeId = cubiomesModule.getValue(sharedBufferPtr + (i * 4), 'i32');
-      buf32[i] = getBiomeColor(biomeId);
+    const heap32 = cubiomesModule.HEAP32;
+    const totalPixels = TILE_PIXELS * TILE_PIXELS;
+
+    if (heap32) {
+      const offset = sharedBufferPtr >> 2;
+      for (let i = 0; i < totalPixels; i++) {
+        const biomeId = heap32[offset + i];
+        buf32[i] = (biomeId >= 0 && biomeId < 256) ? BIOME_COLOR_LUT[biomeId] : 0xff404040;
+      }
+    } else {
+      for (let i = 0; i < totalPixels; i++) {
+        const biomeId = cubiomesModule.getValue(sharedBufferPtr + (i * 4), 'i32');
+        buf32[i] = (biomeId >= 0 && biomeId < 256) ? BIOME_COLOR_LUT[biomeId] : 0xff404040;
+      }
     }
 
     offCtx.putImageData(imgData, 0, 0);
 
-    if (tileCache.size > 1500) {
+    if (tileCache.size > 2000) {
       const oldestKey = tileCache.keys().next().value;
       tileCache.delete(oldestKey);
     }
 
-    tileCache.set(key, offscreen);
+    tileCache.set(key, {
+      canvas: offscreen,
+      isHiRes: true,
+      loadedAt: performance.now()
+    });
   } catch (err) {
-    console.error(`Tile error [${tx}, ${tz}]:`, err);
+    console.error(`Hi-res tile error [LOD ${lod}, ${tx}, ${tz}]:`, err);
+  }
+}
+
+function processTileQueue() {
+  if (!cubiomesModule || !sharedBufferPtr) {
+    isQueueProcessing = false;
+    return;
   }
 
-  return offscreen;
+  if (pendingTiles.length === 0) {
+    isQueueProcessing = false;
+    return;
+  }
+
+  isQueueProcessing = true;
+  const startTime = performance.now();
+
+  while (pendingTiles.length > 0) {
+    const nextJob = pendingTiles[0];
+    if (nextJob.type === 'preview') {
+      const job = pendingTiles.shift();
+      generatePreviewTile(job.tx, job.tz, job.lodLevel);
+      if (performance.now() - startTime >= 16) break;
+    } else {
+      const job = pendingTiles.shift();
+      generateHiResTile(job.tx, job.tz, job.lodLevel);
+      if (performance.now() - startTime >= 16) break;
+    }
+  }
+
+  requestRender();
+
+  if (pendingTiles.length > 0) {
+    setTimeout(processTileQueue, 0);
+  } else {
+    isQueueProcessing = false;
+  }
+}
+
+function scheduleTileGeneration(immediate = false) {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
+
+  if (immediate) {
+    collectAndStartTileQueue();
+  } else {
+    // 150ms debounce after user stops scrolling/dragging
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null;
+      collectAndStartTileQueue();
+    }, 150);
+  }
+}
+
+function collectAndStartTileQueue() {
+  if (!cssWidth || !cssHeight) return;
+
+  const activeLOD = getActiveLOD();
+  const halfW = cssWidth / 2;
+  const halfH = cssHeight / 2;
+  const pxPerBlock = camera.zoom / 4;
+
+  const minBlockX = camera.x - halfW / pxPerBlock;
+  const maxBlockX = camera.x + halfW / pxPerBlock;
+  const minBlockZ = camera.z - halfH / pxPerBlock;
+  const maxBlockZ = camera.z + halfH / pxPerBlock;
+
+  // 1-tile buffer padding around the viewport for smooth panning
+  const BUFFER_TILES = 1;
+  const minTileX = Math.floor(minBlockX / activeLOD.blocksPerTile) - BUFFER_TILES;
+  const maxTileX = Math.ceil(maxBlockX / activeLOD.blocksPerTile) + BUFFER_TILES;
+  const minTileZ = Math.floor(minBlockZ / activeLOD.blocksPerTile) - BUFFER_TILES;
+  const maxTileZ = Math.ceil(maxBlockZ / activeLOD.blocksPerTile) + BUFFER_TILES;
+
+  const previewMissing = [];
+  const hiresMissing = [];
+
+  for (let tx = minTileX; tx <= maxTileX; tx++) {
+    for (let tz = minTileZ; tz <= maxTileZ; tz++) {
+      const key = `${activeLOD.lod},${tx},${tz},${currentSeed},${currentDim},${selectedVersion},${selectedY}`;
+      const entry = tileCache.get(key);
+      if (!entry) {
+        if (activeLOD.lod === 0) {
+          previewMissing.push({ tx, tz, lodLevel: activeLOD, type: 'preview' });
+        }
+        hiresMissing.push({ tx, tz, lodLevel: activeLOD, type: 'hires' });
+      } else if (!entry.isHiRes) {
+        hiresMissing.push({ tx, tz, lodLevel: activeLOD, type: 'hires' });
+      }
+    }
+  }
+
+  // Sort missing tiles in concentric square rings (Chebyshev distance)
+  // so the entire center fills in first
+  const centerTx = camera.x / activeLOD.blocksPerTile;
+  const centerTz = camera.z / activeLOD.blocksPerTile;
+  const sortFn = (a, b) => {
+    const ringA = Math.max(Math.abs(a.tx - centerTx), Math.abs(a.tz - centerTz));
+    const ringB = Math.max(Math.abs(b.tx - centerTx), Math.abs(b.tz - centerTz));
+    if (Math.abs(ringA - ringB) > 0.001) return ringA - ringB;
+    const distA = (a.tx - centerTx) ** 2 + (a.tz - centerTz) ** 2;
+    const distB = (b.tx - centerTx) ** 2 + (b.tz - centerTz) ** 2;
+    return distA - distB;
+  };
+
+  previewMissing.sort(sortFn);
+  hiresMissing.sort(sortFn);
+
+  pendingTiles = [...previewMissing, ...hiresMissing];
+
+  if (!isQueueProcessing && pendingTiles.length > 0) {
+    processTileQueue();
+  }
 }
 
 function getBiomeAt(blockX, blockZ) {
@@ -120,47 +691,97 @@ function renderView() {
   ctx.save();
   ctx.scale(dpr, dpr);
 
-  ctx.fillStyle = '#111';
+  ctx.fillStyle = currentDim === 1 ? '#020128' : '#111';
   ctx.fillRect(0, 0, cssWidth, cssHeight);
-  ctx.imageSmoothingEnabled = camera.zoom < 1.0;
 
+  const activeLOD = getActiveLOD();
   const halfW = cssWidth / 2;
   const halfH = cssHeight / 2;
   const pxPerBlock = camera.zoom / 4;
-  const tileScreenSize = BLOCKS_PER_TILE * pxPerBlock;
+  const tileScreenSize = activeLOD.blocksPerTile * pxPerBlock;
 
   const minBlockX = camera.x - halfW / pxPerBlock;
   const maxBlockX = camera.x + halfW / pxPerBlock;
   const minBlockZ = camera.z - halfH / pxPerBlock;
   const maxBlockZ = camera.z + halfH / pxPerBlock;
 
-  const minTileX = Math.floor(minBlockX / BLOCKS_PER_TILE);
-  const maxTileX = Math.ceil(maxBlockX / BLOCKS_PER_TILE);
-  const minTileZ = Math.floor(minBlockZ / BLOCKS_PER_TILE);
-  const maxTileZ = Math.ceil(maxBlockZ / BLOCKS_PER_TILE);
-
-  const totalTiles = (maxTileX - minTileX + 1) * (maxTileZ - minTileZ + 1);
-  if (totalTiles > 800) {
-    ctx.fillStyle = '#888';
-    ctx.font = '14px monospace';
-    ctx.fillText('Zoomed too far out. Scroll in to view.', halfW - 140, halfH);
-    drawRulers(halfW, halfH, pxPerBlock);
-    ctx.restore();
-    return;
-  }
+  const minTileX = Math.floor(minBlockX / activeLOD.blocksPerTile);
+  const maxTileX = Math.ceil(maxBlockX / activeLOD.blocksPerTile);
+  const minTileZ = Math.floor(minBlockZ / activeLOD.blocksPerTile);
+  const maxTileZ = Math.ceil(maxBlockZ / activeLOD.blocksPerTile);
 
   for (let tx = minTileX; tx <= maxTileX; tx++) {
     for (let tz = minTileZ; tz <= maxTileZ; tz++) {
-      const tileCanvas = getTile(tx, tz);
-      const blockX = tx * BLOCKS_PER_TILE;
-      const blockZ = tz * BLOCKS_PER_TILE;
+      const key = `${activeLOD.lod},${tx},${tz},${currentSeed},${currentDim},${selectedVersion},${selectedY}`;
+      const tileEntry = tileCache.get(key);
+      const blockX = tx * activeLOD.blocksPerTile;
+      const blockZ = tz * activeLOD.blocksPerTile;
 
       const screenX = halfW + (blockX - camera.x) * pxPerBlock;
       const screenY = halfH + (blockZ - camera.z) * pxPerBlock;
 
-      ctx.drawImage(tileCanvas, screenX, screenY, tileScreenSize + 0.5, tileScreenSize + 0.5);
+      if (tileEntry) {
+        ctx.save();
+        // Smooth bilinear filtering for preview tiles or zoomed-out views; crisp nearest when inspecting blocks
+        ctx.imageSmoothingEnabled = !tileEntry.isHiRes || pxPerBlock < 1.0;
+        ctx.drawImage(tileEntry.canvas, screenX, screenY, tileScreenSize + 0.5, tileScreenSize + 0.5);
+        ctx.restore();
+      } else {
+        // Fallback 1: Check parent LOD tile (zooming in)
+        let fallbackDrawn = false;
+        if (activeLOD.lod < LOD_LEVELS.length - 1) {
+          const parentLOD = LOD_LEVELS[activeLOD.lod + 1];
+          const ratio = parentLOD.blocksPerTile / activeLOD.blocksPerTile;
+          const parentTx = Math.floor(tx / ratio);
+          const parentTz = Math.floor(tz / ratio);
+          const parentKey = `${parentLOD.lod},${parentTx},${parentTz},${currentSeed},${currentDim},${selectedVersion},${selectedY}`;
+          const parentEntry = tileCache.get(parentKey);
+          if (parentEntry) {
+            const modX = ((tx % ratio) + ratio) % ratio;
+            const modZ = ((tz % ratio) + ratio) % ratio;
+            const subW = TILE_PIXELS / ratio;
+            const subH = TILE_PIXELS / ratio;
+            ctx.save();
+            ctx.imageSmoothingEnabled = true;
+            ctx.drawImage(
+              parentEntry.canvas,
+              modX * subW, modZ * subH, subW, subH,
+              screenX, screenY, tileScreenSize + 0.5, tileScreenSize + 0.5
+            );
+            ctx.restore();
+            fallbackDrawn = true;
+          }
+        }
+        // Fallback 2: Check child LOD tiles (zooming out)
+        if (!fallbackDrawn && activeLOD.lod > 0) {
+          const childLOD = LOD_LEVELS[activeLOD.lod - 1];
+          const ratio = activeLOD.blocksPerTile / childLOD.blocksPerTile;
+          const cTileSize = tileScreenSize / ratio;
+          for (let cx = 0; cx < ratio; cx++) {
+            for (let cz = 0; cz < ratio; cz++) {
+              const cTx = tx * ratio + cx;
+              const cTz = tz * ratio + cz;
+              const cKey = `${childLOD.lod},${cTx},${cTz},${currentSeed},${currentDim},${selectedVersion},${selectedY}`;
+              const cEntry = tileCache.get(cKey);
+              if (cEntry) {
+                const cScreenX = screenX + cx * cTileSize;
+                const cScreenY = screenY + cz * cTileSize;
+                ctx.drawImage(cEntry.canvas, cScreenX, cScreenY, cTileSize + 0.5, cTileSize + 0.5);
+                fallbackDrawn = true;
+              }
+            }
+          }
+        }
+        if (!fallbackDrawn) {
+          ctx.fillStyle = currentDim === 1 ? '#020128' : '#141414';
+          ctx.fillRect(screenX, screenY, tileScreenSize + 0.5, tileScreenSize + 0.5);
+        }
+      }
     }
   }
+
+  // Draw Structure Markers
+  drawStructureMarkers(halfW, halfH, pxPerBlock, minBlockX, maxBlockX, minBlockZ, maxBlockZ);
 
   if (targetPin) {
     drawTargetPin(halfW, halfH, pxPerBlock);
@@ -168,6 +789,92 @@ function renderView() {
 
   drawRulers(halfW, halfH, pxPerBlock);
   ctx.restore();
+}
+
+function drawStructureMarkers(halfW, halfH, pxPerBlock, minBlockX, maxBlockX, minBlockZ, maxBlockZ) {
+  currentVisibleMarkers = [];
+  window.__currentVisibleMarkers = currentVisibleMarkers;
+  window.__renderView = renderView;
+  const dimStr = String(currentDim);
+  const enabledSet = enabledStructures[dimStr] || new Set();
+
+  const zoomNoticeBadge = document.getElementById('zoomNoticeBadge');
+  const DENSE_TYPES = ['slime', 'geode', 'cave', 'ore_vein', 'lava_pool'];
+  const hasDenseEnabled = DENSE_TYPES.some(f => enabledSet.has(f));
+  const isDenseSuppressed = (pxPerBlock < 0.08);
+
+  if (zoomNoticeBadge) {
+    if (hasDenseEnabled && isDenseSuppressed) {
+      zoomNoticeBadge.classList.remove('hidden');
+    } else {
+      zoomNoticeBadge.classList.add('hidden');
+    }
+  }
+
+  if (enabledSet.size === 0) return;
+
+  // Zoom threshold: hide all features when zoomed out to extreme overview (below ~0.02 px/block)
+  if (pxPerBlock < 0.02) return;
+
+  // Request background structure load via Chunkbase Wasm engine for the visible area
+  ensureStructuresLoaded({
+    seed: currentSeed,
+    version: selectedVersion,
+    dimension: currentDim,
+    minX: minBlockX,
+    maxX: maxBlockX,
+    minZ: minBlockZ,
+    maxZ: maxBlockZ,
+    enabledSet,
+    suppressDense: isDenseSuppressed,
+    onUpdate: () => {
+      renderView();
+    }
+  });
+
+  const rawMarkers = getVisibleStructures({
+    dimension: currentDim,
+    minX: minBlockX,
+    maxX: maxBlockX,
+    minZ: minBlockZ,
+    maxZ: maxBlockZ,
+    seed: currentSeed,
+    version: selectedVersion,
+    enabledSet
+  });
+
+  for (const m of rawMarkers) {
+    const screenX = halfW + (m.x - camera.x) * pxPerBlock;
+    const screenY = halfH + (m.z - camera.z) * pxPerBlock;
+    if (screenX < -30 || screenX > cssWidth + 30 || screenY < -30 || screenY > cssHeight + 30) continue;
+
+    const compKey = getCompletionKey(m);
+    const isCompleted = completedLocations.has(compKey);
+    const isHovered = (hoveredMarker && hoveredMarker.id === m.id);
+
+    drawPoiMarker(ctx, m.spriteKey, screenX, screenY, isCompleted, isHovered);
+
+    currentVisibleMarkers.push({
+      marker: m,
+      screenX,
+      screenY,
+      isCompleted
+    });
+  }
+
+  window.__currentVisibleMarkers = currentVisibleMarkers;
+
+  // If a popup marker is currently active, update its anchored position on screen
+  if (activePopupMarker && markerPopup) {
+    const pScreenX = halfW + (activePopupMarker.x - camera.x) * pxPerBlock;
+    const pScreenY = halfH + (activePopupMarker.z - camera.z) * pxPerBlock;
+    if (pScreenX >= 0 && pScreenX <= cssWidth && pScreenY >= 0 && pScreenY <= cssHeight) {
+      positionMarkerPopup(pScreenX, pScreenY);
+      markerPopup.classList.remove('hidden');
+    } else {
+      markerPopup.classList.add('hidden');
+    }
+  }
 }
 
 function drawTargetPin(halfW, halfH, pxPerBlock) {
@@ -244,7 +951,7 @@ function drawRulers(halfW, halfH, pxPerBlock) {
   const targetPixels = 110;
   const rawInterval = targetPixels / pxPerBlock;
   const power = Math.pow(2, Math.round(Math.log2(rawInterval)));
-  const interval = Math.max(64, power);
+  const interval = Math.max(8, power);
 
   ctx.fillStyle = '#ccc';
   ctx.font = '11px monospace';
@@ -291,21 +998,58 @@ function updatePointerInfo(clientX, clientY) {
   biomeTag.textContent = getBiomeAt(currentBlockX, currentBlockZ);
 }
 
+let mouseDownPos = { x: 0, y: 0 };
+let touchStartPos = { x: 0, y: 0 };
+let lastTouchX = 0;
+let lastTouchY = 0;
+
 canvas.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return;
   camera.isDragging = true;
   camera.lastMouseX = e.clientX;
   camera.lastMouseY = e.clientY;
+  mouseDownPos = { x: e.clientX, y: e.clientY };
+});
+
+canvas.addEventListener('click', (e) => {
+  if (e.button !== 0) return;
+  const dist = Math.hypot(e.clientX - mouseDownPos.x, e.clientY - mouseDownPos.y);
+  if (dist > 6) return; // Was a drag, not a click
+
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+
+  let clickedItem = null;
+  let minDist = 16;
+  for (const item of currentVisibleMarkers) {
+    const d = Math.hypot(mouseX - item.screenX, mouseY - item.screenY);
+    if (d <= minDist) {
+      minDist = d;
+      clickedItem = item;
+    }
+  }
+
+  if (clickedItem) {
+    openMarkerPopup(clickedItem.marker, clickedItem.screenX, clickedItem.screenY);
+  } else {
+    closeMarkerPopup();
+  }
 });
 
 window.addEventListener('mouseup', () => {
-  camera.isDragging = false;
+  if (camera.isDragging) {
+    camera.isDragging = false;
+    canvas.style.cursor = 'grab';
+    scheduleTileGeneration(true);
+  }
 });
 
 window.addEventListener('mousemove', (e) => {
   updatePointerInfo(e.clientX, e.clientY);
 
   if (camera.isDragging) {
+    canvas.style.cursor = 'grabbing';
     const pxPerBlock = camera.zoom / 4;
     const dx = e.clientX - camera.lastMouseX;
     const dy = e.clientY - camera.lastMouseY;
@@ -316,7 +1060,37 @@ window.addEventListener('mousemove', (e) => {
     camera.lastMouseX = e.clientX;
     camera.lastMouseY = e.clientY;
 
-    renderView();
+    requestRender();
+    scheduleTileGeneration(false); // Debounced while dragging
+  } else {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    if (mouseX >= 0 && mouseX <= cssWidth && mouseY >= 0 && mouseY <= cssHeight) {
+      let hitItem = null;
+      let minDist = 16;
+      for (const item of currentVisibleMarkers) {
+        const d = Math.hypot(mouseX - item.screenX, mouseY - item.screenY);
+        if (d <= minDist) {
+          minDist = d;
+          hitItem = item;
+        }
+      }
+
+      if (hitItem) {
+        canvas.style.cursor = 'pointer';
+        if (!hoveredMarker || hoveredMarker.id !== hitItem.marker.id) {
+          hoveredMarker = hitItem.marker;
+          requestRender();
+        }
+      } else {
+        canvas.style.cursor = 'grab';
+        if (hoveredMarker) {
+          hoveredMarker = null;
+          requestRender();
+        }
+      }
+    }
   }
 });
 
@@ -327,6 +1101,9 @@ canvas.addEventListener('touchstart', (e) => {
     camera.isDragging = true;
     camera.lastMouseX = e.touches[0].clientX;
     camera.lastMouseY = e.touches[0].clientY;
+    touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    lastTouchX = e.touches[0].clientX;
+    lastTouchY = e.touches[0].clientY;
     updatePointerInfo(e.touches[0].clientX, e.touches[0].clientY);
   } else if (e.touches.length === 2) {
     camera.isDragging = false;
@@ -348,33 +1125,77 @@ canvas.addEventListener('touchmove', (e) => {
 
     camera.lastMouseX = e.touches[0].clientX;
     camera.lastMouseY = e.touches[0].clientY;
+    lastTouchX = e.touches[0].clientX;
+    lastTouchY = e.touches[0].clientY;
 
     updatePointerInfo(e.touches[0].clientX, e.touches[0].clientY);
-    renderView();
+    requestRender();
+    scheduleTileGeneration(false);
   } else if (e.touches.length === 2) {
     const currentDistance = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
       e.touches[0].clientY - e.touches[1].clientY
     );
     const factor = currentDistance / lastTouchDistance;
-    camera.zoom = Math.min(Math.max(camera.zoom * factor, 0.02), 4.0);
+    const { minZoom, maxZoom } = getZoomLimits();
+    camera.zoom = Math.min(Math.max(camera.zoom * factor, minZoom), maxZoom);
     lastTouchDistance = currentDistance;
-    renderView();
+    requestRender();
+    scheduleTileGeneration(false);
   }
 }, { passive: true });
 
 canvas.addEventListener('touchend', () => {
-  camera.isDragging = false;
+  if (camera.isDragging) {
+    camera.isDragging = false;
+    scheduleTileGeneration(true);
+    const dist = Math.hypot(lastTouchX - touchStartPos.x, lastTouchY - touchStartPos.y);
+    if (dist <= 8) {
+      const rect = canvas.getBoundingClientRect();
+      const touchX = lastTouchX - rect.left;
+      const touchY = lastTouchY - rect.top;
+      let clickedItem = null;
+      let minDist = 20;
+      for (const item of currentVisibleMarkers) {
+        const d = Math.hypot(touchX - item.screenX, touchY - item.screenY);
+        if (d <= minDist) {
+          minDist = d;
+          clickedItem = item;
+        }
+      }
+      if (clickedItem) {
+        openMarkerPopup(clickedItem.marker, clickedItem.screenX, clickedItem.screenY);
+      } else {
+        closeMarkerPopup();
+      }
+    }
+  }
 });
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
+  const { minZoom, maxZoom } = getZoomLimits();
   const zoomFactor = e.deltaY < 0 ? 1.25 : 0.8;
-  const newZoom = Math.min(Math.max(camera.zoom * zoomFactor, 0.02), 4.0);
+  const newZoom = Math.min(Math.max(camera.zoom * zoomFactor, minZoom), maxZoom);
 
   if (newZoom !== camera.zoom) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const halfW = cssWidth / 2;
+    const halfH = cssHeight / 2;
+    const oldPxPerBlock = camera.zoom / 4;
+    const newPxPerBlock = newZoom / 4;
+
+    const worldX = camera.x + (mouseX - halfW) / oldPxPerBlock;
+    const worldZ = camera.z + (mouseY - halfH) / oldPxPerBlock;
+
     camera.zoom = newZoom;
-    renderView();
+    camera.x = worldX - (mouseX - halfW) / newPxPerBlock;
+    camera.z = worldZ - (mouseY - halfH) / newPxPerBlock;
+
+    requestRender();
+    scheduleTileGeneration(false); // Debounced: scales existing view smoothly, renders on scroll finish
   }
 }, { passive: false });
 
@@ -382,22 +1203,38 @@ function updateGenerator() {
   if (!cubiomesModule) return;
 
   tileCache.clear();
+  pendingTiles = [];
 
-  const versionEnum = VERSION_MAP[selectedVersion] || 28;
-  const u64Seed = BigInt.asUintN(64, currentSeed);
+  const vConfig = VERSION_MAP[selectedVersion] || { mc: 28, flags: 0, isBedrock: true };
+  const mcEnum = vConfig.mc ?? 28;
+  const flags = vConfig.flags ?? 0;
+  const isBedrock = !!vConfig.isBedrock;
+
+  // Bedrock pre-1.18 seeds were 32-bit
+  let effectiveSeed = currentSeed;
+  if (isBedrock && mcEnum <= 21) {
+    effectiveSeed = BigInt.asUintN(32, currentSeed);
+  }
+  const u64Seed = BigInt.asUintN(64, effectiveSeed);
   const low = Number(u64Seed & 0xffffffffn);
   const high = Number((u64Seed >> 32n) & 0xffffffffn);
 
-  console.log(`Setting generator -> Version: ${versionEnum}, Seed: ${currentSeed}, Dim: ${currentDim}`);
+  console.log(`Setting generator -> Version: ${mcEnum}, Flags: ${flags}, Seed: ${effectiveSeed}, Dim: ${currentDim}`);
 
   cubiomesModule.ccall(
     'init_generator_split',
     null,
     ['number', 'number', 'number', 'number', 'number'],
-    [versionEnum, low, high, currentDim, 0] // flags = 0 to prevent Large Biomes
+    [mcEnum, low, high, currentDim, flags]
   );
 
+  if (biomeTag) {
+    biomeTag.textContent = getBiomeAt(Math.round(camera.x), Math.round(camera.z));
+  }
+
   renderView();
+  requestRender();
+  scheduleTileGeneration(true);
 }
 
 async function loadWasm() {
@@ -416,19 +1253,117 @@ async function loadWasm() {
       sharedBufferPtr = cubiomesModule._malloc(TILE_PIXELS * TILE_PIXELS * 4);
     }
 
+    await loadPoiImages();
+    initStructureWorker();
+    renderFeaturesPanel();
+
     resizeCanvas();
     setInitial3000BlockView();
-    updateGenerator();
+    syncSettings(true);
   } catch (err) {
     console.error('Failed to load WASM:', err);
   }
 }
 
-document.getElementById('gotoBtn').addEventListener('click', () => {
-  const xVal = document.getElementById('gotoX').value.trim();
-  const zVal = document.getElementById('gotoZ').value.trim();
+const seedInput = document.getElementById('seedInput');
+const versionSelect = document.getElementById('versionSelect');
+const dimensionSelect = document.getElementById('dimensionSelect');
+const heightSelect = document.getElementById('heightSelect');
+const heightContainer = document.getElementById('heightContainer');
 
-  if (xVal === '' || zVal === '') return;
+function parseSeed(str) {
+  const trimmed = (str || '').trim();
+  if (/^-?\d+$/.test(trimmed)) {
+    try {
+      return BigInt(trimmed);
+    } catch (_) {}
+  }
+  // Standard Minecraft Java hashCode for string/text seeds
+  let hash = 0;
+  for (let i = 0; i < trimmed.length; i++) {
+    hash = (Math.imul(31, hash) + trimmed.charCodeAt(i)) | 0;
+  }
+  return BigInt(hash);
+}
+
+let seedDebounceTimer = null;
+
+function syncSettings(immediate = false) {
+  if (!seedInput || !dimensionSelect || !heightSelect || !versionSelect) return;
+
+  const newSeed = parseSeed(seedInput.value);
+  const newDim = parseInt(dimensionSelect.value, 10);
+  const newY = parseInt(heightSelect.value, 10);
+  const newVer = versionSelect.value || 'be_26_30';
+
+  // Dynamic height visibility: show for Overworld (0), hide for Nether (-1) and End (1)
+  if (heightContainer) {
+    heightContainer.style.display = (newDim === 0) ? 'inline-flex' : 'none';
+  }
+
+  // Auto-remove waypoint, popup, and markers when switching dimensions
+  if (newDim !== currentDim) {
+    targetPin = null;
+    closeMarkerPopup();
+    currentVisibleMarkers = [];
+    window.__currentVisibleMarkers = [];
+    hoveredMarker = null;
+    const gx = document.getElementById('gotoX');
+    const gz = document.getElementById('gotoZ');
+    if (gx) gx.value = '';
+    if (gz) gz.value = '';
+  }
+
+  const changed = (newSeed !== currentSeed || newDim !== currentDim || newY !== selectedY || newVer !== selectedVersion);
+  if (changed || immediate) {
+    const dimChanged = (newDim !== currentDim);
+    currentSeed = newSeed;
+    currentDim = newDim;
+    selectedY = newY;
+    selectedVersion = newVer;
+    if (dimChanged || immediate) {
+      renderFeaturesPanel();
+    }
+    updateGenerator();
+  }
+}
+
+// Auto-update event listeners for seed, version, dimension, and height
+if (seedInput) {
+  seedInput.addEventListener('input', () => {
+    if (seedDebounceTimer) clearTimeout(seedDebounceTimer);
+    seedDebounceTimer = setTimeout(() => {
+      seedDebounceTimer = null;
+      syncSettings(false);
+    }, 350);
+  });
+
+  seedInput.addEventListener('change', () => {
+    if (seedDebounceTimer) {
+      clearTimeout(seedDebounceTimer);
+      seedDebounceTimer = null;
+    }
+    syncSettings(true);
+  });
+}
+
+if (versionSelect) {
+  versionSelect.addEventListener('change', () => syncSettings(true));
+}
+
+if (dimensionSelect) {
+  dimensionSelect.addEventListener('change', () => syncSettings(true));
+}
+
+if (heightSelect) {
+  heightSelect.addEventListener('change', () => syncSettings(true));
+}
+
+document.getElementById('gotoBtn')?.addEventListener('click', () => {
+  const xVal = document.getElementById('gotoX')?.value.trim();
+  const zVal = document.getElementById('gotoZ')?.value.trim();
+
+  if (!xVal || !zVal) return;
   const targetX = parseInt(xVal, 10);
   const targetZ = parseInt(zVal, 10);
   if (isNaN(targetX) || isNaN(targetZ)) return;
@@ -436,27 +1371,33 @@ document.getElementById('gotoBtn').addEventListener('click', () => {
   targetPin = { x: targetX, z: targetZ };
   camera.x = targetX;
   camera.z = targetZ;
+  coordsDisplay.textContent = `X: ${targetX} | Z: ${targetZ}`;
+  biomeTag.textContent = getBiomeAt(targetX, targetZ);
 
-  renderView();
+  requestRender();
+  scheduleTileGeneration(true);
 });
 
-document.getElementById('clearPinBtn').addEventListener('click', () => {
+document.getElementById('clearPinBtn')?.addEventListener('click', () => {
   targetPin = null;
-  document.getElementById('gotoX').value = '';
-  document.getElementById('gotoZ').value = '';
-  renderView();
+  const gx = document.getElementById('gotoX');
+  const gz = document.getElementById('gotoZ');
+  if (gx) gx.value = '';
+  if (gz) gz.value = '';
+  requestRender();
 });
 
-document.getElementById('renderBtn').addEventListener('click', () => {
-  const rawInput = document.getElementById('seedInput').value.trim();
-  try {
-    currentSeed = BigInt(rawInput);
-    currentDim = parseInt(document.getElementById('dimensionSelect').value, 10);
-    selectedY = parseInt(document.getElementById('heightSelect').value, 10);
-    updateGenerator();
-  } catch (e) {
-    alert('Invalid numeric seed.');
-  }
+['gotoX', 'gotoZ'].forEach(id => {
+  document.getElementById(id)?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      document.getElementById('gotoBtn')?.click();
+    }
+  });
 });
+
+// Initial height dropdown visibility setup
+if (heightContainer && dimensionSelect) {
+  heightContainer.style.display = (dimensionSelect.value === '0') ? 'inline-flex' : 'none';
+}
 
 loadWasm();

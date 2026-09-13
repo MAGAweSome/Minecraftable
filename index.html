@@ -14,11 +14,18 @@
       padding: 6px 16px;
       background: #1e1e1e;
       display: flex;
-      gap: 10px;
+      gap: 14px;
       align-items: center;
       z-index: 100;
       border-bottom: 1px solid #333;
       flex-wrap: wrap;
+    }
+    #toolbar label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #eee;
     }
     #toolbar input, #toolbar select, #toolbar button {
       padding: 6px 10px;
@@ -29,8 +36,6 @@
       font-size: 13px;
     }
     .coord-input { width: 80px; }
-    #renderBtn { background: #238636; border-color: #2ea043; font-weight: bold; cursor: pointer; }
-    #renderBtn:hover { background: #2ea043; }
     #gotoBtn { background: #1f6feb; border-color: #388bfd; font-weight: bold; cursor: pointer; }
     #gotoBtn:hover { background: #388bfd; }
     #clearPinBtn { background: #444; border-color: #555; cursor: pointer; }
@@ -77,58 +82,415 @@
       color: #58a6ff;
       font-weight: bold;
     }
+
+    /* Features Side Panel */
+    #featuresPanel {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 270px;
+      height: 100%;
+      background: #1c1c1c;
+      border-left: 1px solid #333;
+      box-shadow: -4px 0 16px rgba(0,0,0,0.5);
+      z-index: 150;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.22s ease-in-out;
+    }
+    #featuresPanel.open {
+      transform: translateX(0);
+    }
+    .features-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid #333;
+      background: #252525;
+    }
+    .features-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #fff;
+    }
+    .features-close-btn {
+      background: none;
+      border: none;
+      color: #888;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 2px 6px;
+    }
+    .features-close-btn:hover {
+      color: #fff;
+    }
+    .features-actions {
+      display: flex;
+      gap: 8px;
+      padding: 10px 16px;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .features-action-btn {
+      flex: 1;
+      padding: 5px 8px;
+      font-size: 12px;
+      background: #2b2b2b;
+      border: 1px solid #444;
+      color: #ddd;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .features-action-btn:hover {
+      background: #388bfd;
+      border-color: #388bfd;
+      color: #fff;
+    }
+    .features-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .feature-item:hover {
+      background: #2b2b2b;
+    }
+    .feature-icon-thumb {
+      width: 22px;
+      height: 22px;
+      background-image: url('/chunk-finders-tn.webp');
+      background-repeat: no-repeat;
+      flex-shrink: 0;
+    }
+    .feature-label {
+      flex: 1;
+      font-size: 13px;
+      color: #eee;
+    }
+    .feature-checkbox {
+      width: 16px;
+      height: 16px;
+      accent-color: #1f6feb;
+      cursor: pointer;
+    }
+
+    /* Marker Click Popup Card (Chunkbase style) */
+    .marker-popup {
+      position: absolute;
+      background: #ffffff;
+      color: #111111;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.2);
+      padding: 12px 16px;
+      min-width: 190px;
+      z-index: 180;
+      transform: translate(-50%, -100%);
+      pointer-events: auto;
+      user-select: text;
+    }
+    .marker-popup.hidden {
+      display: none;
+    }
+    .marker-popup-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .marker-popup-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #1a1a1a;
+      white-space: nowrap;
+    }
+    .popup-icon-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 2px;
+      display: flex;
+      align-items: center;
+      color: #2a1fff;
+    }
+    .popup-icon-btn:hover svg {
+      stroke: #1a14c0;
+    }
+    .marker-popup-coords-row {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+      font-size: 13px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      color: #333333;
+    }
+    .zoom-notice {
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fcd34d;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      user-select: none;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .zoom-notice.hidden {
+      display: none !important;
+    }
+    .copy-toast {
+      position: absolute;
+      right: -10px;
+      top: -24px;
+      background: #111;
+      color: #fff;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .copy-toast.hidden {
+      display: none;
+    }
+    .marker-popup-divider {
+      height: 1px;
+      background: #e5e7eb;
+      margin: 10px 0;
+    }
+    .marker-popup-actions {
+      display: flex;
+      justify-content: center;
+    }
+    .popup-complete-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 5px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 6px;
+      border: 1px solid #d0d7de;
+      background: #ffffff;
+      color: #24292f;
+      transition: all 0.15s ease;
+      width: 100%;
+    }
+    .popup-complete-btn:hover {
+      background: #f6f8fa;
+      border-color: #bbc0c5;
+    }
+    .popup-complete-btn.completed {
+      background: #2e7d32;
+      border-color: #2e7d32;
+      color: #ffffff;
+      border-radius: 20px;
+    }
+    .popup-complete-btn.completed:hover {
+      background: #256829;
+      border-color: #256829;
+    }
+    .marker-popup-arrow {
+      position: absolute;
+      bottom: -7px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 7px solid transparent;
+      border-right: 7px solid transparent;
+      border-top: 7px solid #ffffff;
+    }
+    .marker-popup.flipped {
+      transform: translate(-50%, 18px);
+    }
+    .marker-popup.flipped .marker-popup-arrow {
+      top: -7px;
+      bottom: auto;
+      border-top: none;
+      border-bottom: 7px solid #ffffff;
+    }
   </style>
 </head>
 <body>
   <div id="toolbar">
-    <label>Seed: <input type="text" id="seedInput" value="-7537587231326715432" /></label>
+    <label><span>Seed:</span><input type="text" id="seedInput" value="-7537587231326715432" /></label>
     
-    <label>Version:
-      <select id="versionSelect">
+    <label><span>Version:</span><select id="versionSelect">
+        <optgroup label="Latest Versions">
+          <option value="be_26_30" selected>Bedrock 26.30 - 26.45</option>
+          <option value="java_26_2">Java 26.2</option>
+          <option value="java_26_2_lb">Java 26.2 (LB)</option>
+        </optgroup>
         <optgroup label="Bedrock Edition">
-          <option value="be_1_21" selected>Bedrock 1.21.60 - 1.21.84</option>
-          <option value="be_1_20">Bedrock 1.20</option>
+          <option value="be_26_30">Bedrock 26.30 - 26.45</option>
+          <option value="be_26_0">Bedrock 26.0 - 26.23</option>
+          <option value="be_1_21_120">Bedrock 1.21.120 - 1.21.132</option>
+          <option value="be_1_21_110">Bedrock 1.21.111 - 1.21.114</option>
+          <option value="be_1_21_90">Bedrock 1.21.90 - 1.21.101</option>
+          <option value="be_1_21_60">Bedrock 1.21.60 - 1.21.84</option>
+          <option value="be_1_21_50">Bedrock 1.21.50</option>
+          <option value="be_1_21">Bedrock 1.21 - 1.21.40</option>
+          <option value="be_1_20_60">Bedrock 1.20.60 - 1.20.81</option>
+          <option value="be_1_20">Bedrock 1.20.0 - 1.20.51</option>
           <option value="be_1_19">Bedrock 1.19</option>
           <option value="be_1_18">Bedrock 1.18</option>
+          <option value="be_1_17">Bedrock 1.17</option>
+          <option value="be_1_16">Bedrock 1.16</option>
+          <option value="be_1_14">Bedrock 1.14</option>
         </optgroup>
         <optgroup label="Java Edition">
-          <option value="java_1_21">Java 1.21</option>
+          <option value="java_26_2">Java 26.2</option>
+          <option value="java_26_1">Java 26.1</option>
+          <option value="java_1_21_9">Java 1.21.9 - 1.21.11</option>
+          <option value="java_1_21_6">Java 1.21.6 - 1.21.8</option>
+          <option value="java_1_21_5">Java 1.21.5</option>
+          <option value="java_1_21_4">Java 1.21.4</option>
+          <option value="java_1_21_2">Java 1.21.2 - 1.21.3</option>
+          <option value="java_1_21">Java 1.21 - 1.21.1</option>
           <option value="java_1_20">Java 1.20</option>
-          <option value="java_1_19">Java 1.19</option>
+          <option value="java_1_19_4">Java 1.19.3 - 1.19.4</option>
+          <option value="java_1_19">Java 1.19 - 1.19.2</option>
           <option value="java_1_18">Java 1.18</option>
+          <option value="java_1_17">Java 1.17</option>
+          <option value="java_1_16">Java 1.16</option>
+          <option value="java_1_15">Java 1.15</option>
+          <option value="java_1_14">Java 1.14</option>
+          <option value="java_1_13">Java 1.13</option>
+          <option value="java_1_12">Java 1.12</option>
+          <option value="java_1_11">Java 1.11</option>
+          <option value="java_1_10">Java 1.10</option>
+          <option value="java_1_9">Java 1.9</option>
+          <option value="java_1_8">Java 1.8</option>
+          <option value="java_1_7">Java 1.7</option>
+          <option value="java_1_6">Java 1.6</option>
+          <option value="java_1_5">Java 1.5</option>
+          <option value="java_1_4">Java 1.4</option>
+          <option value="java_1_3">Java 1.3</option>
+          <option value="java_1_2">Java 1.2</option>
+          <option value="java_1_1">Java 1.1</option>
+          <option value="java_1_0">Java 1.0</option>
+          <option value="java_b1_8">Java Beta 1.8</option>
+          <option value="java_b1_7">Java Beta 1.7</option>
+        </optgroup>
+        <optgroup label="Java Edition - Large Biomes">
+          <option value="java_26_2_lb">Java 26.2 (LB)</option>
+          <option value="java_26_1_lb">Java 26.1 (LB)</option>
+          <option value="java_1_21_9_lb">Java 1.21.9 - 1.21.11 (LB)</option>
+          <option value="java_1_21_6_lb">Java 1.21.6 - 1.21.8 (LB)</option>
+          <option value="java_1_21_5_lb">Java 1.21.5 (LB)</option>
+          <option value="java_1_21_4_lb">Java 1.21.4 (LB)</option>
+          <option value="java_1_21_2_lb">Java 1.21.2 - 1.21.3 (LB)</option>
+          <option value="java_1_21_lb">Java 1.21 - 1.21.1 (LB)</option>
+          <option value="java_1_20_lb">Java 1.20 (LB)</option>
+          <option value="java_1_19_4_lb">Java 1.19.3 - 1.19.4 (LB)</option>
+          <option value="java_1_19_lb">Java 1.19 - 1.19.2 (LB)</option>
+          <option value="java_1_18_lb">Java 1.18 (LB)</option>
+          <option value="java_1_17_lb">Java 1.17 (LB)</option>
+          <option value="java_1_16_lb">Java 1.16 (LB)</option>
+          <option value="java_1_15_lb">Java 1.15 (LB)</option>
+          <option value="java_1_14_lb">Java 1.14 (LB)</option>
+          <option value="java_1_13_lb">Java 1.13 (LB)</option>
+          <option value="java_1_12_lb">Java 1.12 (LB)</option>
+          <option value="java_1_11_lb">Java 1.11 (LB)</option>
+          <option value="java_1_10_lb">Java 1.10 (LB)</option>
+          <option value="java_1_9_lb">Java 1.9 (LB)</option>
+          <option value="java_1_8_lb">Java 1.8 (LB)</option>
+          <option value="java_1_7_lb">Java 1.7 (LB)</option>
         </optgroup>
       </select>
     </label>
 
-    <label>Dimension: 
-      <select id="dimensionSelect">
+    <label><span>Dimension:</span><select id="dimensionSelect">
         <option value="0" selected>Overworld</option>
         <option value="-1">Nether</option>
         <option value="1">End</option>
       </select>
     </label>
 
-    <label>Height:
-      <select id="heightSelect">
-        <option value="320" selected>Surface</option>
-        <option value="64">Sea Level (Y 64)</option>
-        <option value="0">Underground (Y 0)</option>
+    <label id="heightContainer"><span>Biome Height:</span><select id="heightSelect">
+        <option value="319" selected>Surface</option>
+        <option value="0">Underground</option>
         <option value="-51">Bottom (Y -51)</option>
       </select>
     </label>
 
-    <button id="renderBtn">Render</button>
-
     <div class="separator"></div>
 
-    <label>X: <input type="number" id="gotoX" class="coord-input" placeholder="0" /></label>
-    <label>Z: <input type="number" id="gotoZ" class="coord-input" placeholder="0" /></label>
+    <label><span>X:</span><input type="number" id="gotoX" class="coord-input" placeholder="0" /></label>
+    <label><span>Z:</span><input type="number" id="gotoZ" class="coord-input" placeholder="0" /></label>
     <button id="gotoBtn">Go!</button>
     <button id="clearPinBtn">Clear</button>
+
+    <div style="margin-left: auto; display: inline-flex; align-items: center; gap: 10px;">
+      <div id="zoomNoticeBadge" class="zoom-notice hidden">⚠️ Zoom in to show all selected features</div>
+      <button id="featuresToggleBtn" style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
+        <span>☰ Features</span>
+        <span id="featuresCountBadge" style="background:#1f6feb; border-radius:10px; padding:1px 6px; font-size:11px; font-weight:bold;">0</span>
+      </button>
+    </div>
   </div>
 
   <div id="container">
     <canvas id="viewport"></canvas>
+
+    <!-- Side Panel for Structures & Features -->
+    <aside id="featuresPanel">
+      <div class="features-header">
+        <div class="features-title">Features</div>
+        <button id="featuresCloseBtn" class="features-close-btn" title="Close Panel">✕</button>
+      </div>
+      <div class="features-actions">
+        <button id="selectAllBtn" class="features-action-btn">Select all</button>
+        <button id="deselectAllBtn" class="features-action-btn">Deselect all</button>
+      </div>
+      <div id="featuresList" class="features-list">
+        <!-- Dynamic feature checkboxes -->
+      </div>
+    </aside>
+
+    <!-- Chunkbase-style Marker Click Popup -->
+    <div id="markerPopup" class="marker-popup hidden">
+      <div class="marker-popup-header">
+        <span id="popupTitle" class="marker-popup-title">Bastion (Bridges)</span>
+        <button id="popupShareBtn" class="popup-icon-btn" title="Share">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2a1fff" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        </button>
+      </div>
+      <div class="marker-popup-coords-row">
+        <span id="popupCoords" class="marker-popup-coords">X: 583 Y: 33 Z: -224</span>
+        <button id="popupCopyBtn" class="popup-icon-btn" title="Copy Coordinates">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2a1fff" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+        <span id="copyToast" class="copy-toast hidden">Copied!</span>
+      </div>
+      <div class="marker-popup-divider"></div>
+      <div class="marker-popup-actions">
+        <button id="popupCompleteBtn" class="popup-complete-btn">
+          <span id="completeIcon">☐</span> <span id="completeText">Completed</span>
+        </button>
+      </div>
+      <div class="marker-popup-arrow"></div>
+    </div>
+
     <div id="info-bar">
       <span id="coords-display">X: 0 | Z: 0</span>
       <span id="biome-tag">Ocean</span>
