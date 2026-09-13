@@ -134,6 +134,14 @@ export function getPoiSpriteKey(structType, variant) {
       if (variant === 'Treasure' || variant === 'treasure' || variant === 'Treasure room') return 'bastion-treasure';
       if (variant === 'Housing' || variant === 'units' || variant === 'Housing units') return 'bastion-units';
       return 'bastion';
+    case 'bastion_bridge':
+      return 'bastion-bridge';
+    case 'bastion_stables':
+      return 'bastion-stables';
+    case 'bastion_treasure':
+      return 'bastion-treasure';
+    case 'bastion_housing':
+      return 'bastion-units';
     case 'fortress':
     case 'nether_fortress':
       return 'nether-fortress';
@@ -143,6 +151,8 @@ export function getPoiSpriteKey(structType, variant) {
     case 'nether_fossil':
     case 'fossil':
       return variant === 'ghast' ? 'fossil-ghast' : 'fossil';
+    case 'end_city_ship':
+      return 'end-city-ship';
     case 'end_city':
       return variant === 'ship' || variant === 'Ship' ? 'end-city-ship' : 'end-city';
     case 'end_gateway':

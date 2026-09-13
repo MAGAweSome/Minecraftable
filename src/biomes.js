@@ -141,10 +141,501 @@ for (const [id, data] of Object.entries(BIOMES)) {
   }
 }
 
+// Active Color LUT for real-time biome highlighting
+export const ACTIVE_COLOR_LUT = new Uint32Array(256);
+ACTIVE_COLOR_LUT.set(BIOME_COLOR_LUT);
+
+export function updateActiveColorLUT(highlightedSet) {
+  if (!highlightedSet || highlightedSet.size === 0) {
+    ACTIVE_COLOR_LUT.set(BIOME_COLOR_LUT);
+    return;
+  }
+
+  for (let id = 0; id < 256; id++) {
+    const orig = BIOME_COLOR_LUT[id];
+    if (highlightedSet.has(id)) {
+      ACTIVE_COLOR_LUT[id] = orig;
+    } else {
+      let r = orig & 0xff;
+      let g = (orig >> 8) & 0xff;
+      let b = (orig >> 16) & 0xff;
+
+      // For water/ocean biomes where pure blue has little green component,
+      // give a subtle cyan balance so the wash renders as crystal ice-blue matching Chunkbase
+      if (b > r + 30 && b > g + 20) {
+        g = Math.min(255, Math.round(g + (b - g) * 0.35));
+      }
+
+      // Chunkbase high-key wash: blend ~74% white and 26% tinted color
+      // Everything else becomes almost white so the highlighted biomes stand out sharply
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      const adjR = r * 0.85 + gray * 0.15;
+      const adjG = g * 0.85 + gray * 0.15;
+      const adjB = b * 0.85 + gray * 0.15;
+
+      const whiteMix = 0.74;
+      const whitePart = 255 * whiteMix;
+      const colorPart = 1 - whiteMix;
+
+      const dimR = Math.min(255, Math.round(adjR * colorPart + whitePart));
+      const dimG = Math.min(255, Math.round(adjG * colorPart + whitePart));
+      const dimB = Math.min(255, Math.round(adjB * colorPart + whitePart));
+      const alpha = 0xff; // Fully opaque
+      ACTIVE_COLOR_LUT[id] = (alpha << 24) | (dimB << 16) | (dimG << 8) | dimR;
+    }
+  }
+}
+
 export function getBiomeColor(id) {
   return BIOMES[id] ? BIOMES[id].color : DEFAULT_COLOR;
 }
 
+export function getBiomeCssColor(id) {
+  const c = getBiomeColor(id);
+  const r = c & 0xff;
+  const g = (c >> 8) & 0xff;
+  const b = (c >> 16) & 0xff;
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
 export function getBiomeName(id) {
   return BIOMES[id] ? BIOMES[id].name : `Unknown (${id})`;
+}
+
+// Grouped biomes by dimension for the Highlight Biomes UI
+export const BIOME_GROUPS = {
+  // Overworld (0)
+  '0': [
+    {
+      name: "Plains",
+      biomes: [
+        { id: 1, name: "Plains" },
+        { id: 12, name: "Snowy Plains" },
+        { id: 14, name: "Mushroom Fields" },
+        { id: 35, name: "Savanna" },
+        { id: 129, name: "Sunflower Plains" },
+        { id: 140, name: "Ice Spikes" }
+      ]
+    },
+    {
+      name: "Woodlands",
+      biomes: [
+        { id: 4, name: "Forest" },
+        { id: 27, name: "Birch Forest" },
+        { id: 29, name: "Dark Forest" },
+        { id: 5, name: "Taiga" },
+        { id: 30, name: "Snowy Taiga" },
+        { id: 32, name: "Old Growth Pine Taiga" },
+        { id: 160, name: "Old Growth Spruce Taiga" },
+        { id: 132, name: "Flower Forest" },
+        { id: 155, name: "Old Growth Birch Forest" },
+        { id: 177, name: "Meadow" },
+        { id: 178, name: "Grove" },
+        { id: 185, name: "Cherry Grove" },
+        { id: 186, name: "Pale Garden" }
+      ]
+    },
+    {
+      name: "Mountains",
+      biomes: [
+        { id: 3, name: "Windswept Hills" },
+        { id: 34, name: "Windswept Forest" },
+        { id: 131, name: "Windswept Gravelly Hills" },
+        { id: 163, name: "Windswept Savanna" },
+        { id: 179, name: "Snowy Slopes" },
+        { id: 180, name: "Jagged Peaks" },
+        { id: 181, name: "Frozen Peaks" },
+        { id: 182, name: "Stony Peaks" }
+      ]
+    },
+    {
+      name: "Swamps",
+      biomes: [
+        { id: 6, name: "Swamp" },
+        { id: 134, name: "Swamp Hills" },
+        { id: 184, name: "Mangrove Swamp" }
+      ]
+    },
+    {
+      name: "Sandy & Badlands",
+      biomes: [
+        { id: 2, name: "Desert" },
+        { id: 37, name: "Badlands" },
+        { id: 38, name: "Wooded Badlands" },
+        { id: 165, name: "Eroded Badlands" },
+        { id: 16, name: "Beach" },
+        { id: 26, name: "Snowy Beach" },
+        { id: 25, name: "Stony Shore" }
+      ]
+    },
+    {
+      name: "Jungle",
+      biomes: [
+        { id: 21, name: "Jungle" },
+        { id: 23, name: "Sparse Jungle" },
+        { id: 168, name: "Bamboo Jungle" }
+      ]
+    },
+    {
+      name: "Water & Oceans",
+      biomes: [
+        { id: 0, name: "Ocean" },
+        { id: 24, name: "Deep Ocean" },
+        { id: 44, name: "Warm Ocean" },
+        { id: 45, name: "Lukewarm Ocean" },
+        { id: 48, name: "Deep Lukewarm Ocean" },
+        { id: 46, name: "Cold Ocean" },
+        { id: 49, name: "Deep Cold Ocean" },
+        { id: 10, name: "Frozen Ocean" },
+        { id: 50, name: "Deep Frozen Ocean" },
+        { id: 7, name: "River" },
+        { id: 11, name: "Frozen River" }
+      ]
+    },
+    {
+      name: "Caves & Underground",
+      biomes: [
+        { id: 174, name: "Dripstone Caves" },
+        { id: 175, name: "Lush Caves" },
+        { id: 183, name: "Deep Dark" }
+      ]
+    }
+  ],
+
+  // Nether (-1)
+  '-1': [
+    {
+      name: "Nether Biomes",
+      biomes: [
+        { id: 8, name: "Nether Wastes" },
+        { id: 170, name: "Soul Sand Valley" },
+        { id: 171, name: "Crimson Forest" },
+        { id: 172, name: "Warped Forest" },
+        { id: 173, name: "Basalt Deltas" }
+      ]
+    }
+  ],
+
+  // The End (1)
+  '1': [
+    {
+      name: "The End Biomes",
+      biomes: [
+        { id: 9, name: "The End" },
+        { id: 40, name: "Small End Islands" },
+        { id: 41, name: "End Midlands" },
+        { id: 42, name: "End Highlands" },
+        { id: 43, name: "End Barrens" }
+      ]
+    }
+  ]
+};
+
+/**
+ * Returns a sorted unique list of biomes available in the given dimension.
+ */
+export function getDimensionBiomesList(dimension) {
+  const dimStr = String(dimension);
+  const groups = BIOME_GROUPS[dimStr] || [];
+  const list = [];
+  const seen = new Set();
+  for (const grp of groups) {
+    for (const b of grp.biomes) {
+      if (!seen.has(b.id)) {
+        seen.add(b.id);
+        const def = BIOMES[b.id];
+        list.push({
+          id: b.id,
+          name: b.name,
+          color: def ? def.color : 0xffffffff
+        });
+      }
+    }
+  }
+  return list.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Refines a candidate biome coordinate to the exact closest boundary block using native 4-block Minecraft quart scale.
+ */
+function refineToClosestBiome(cand, targetBiomeId, fromX, fromZ, selectedY, cubiomesModule, scale = 16) {
+  if (!cand || !cubiomesModule) return cand;
+
+  let actualBest = null;
+  let actualMinD = Infinity;
+
+  // Search radius covers the coarse sample grid step
+  const searchRadius = Math.min(128, Math.max(32, scale * 2));
+
+  // Phase 1: if coarse scale was large (>= 32), take 8-block intermediate steps
+  if (scale >= 32) {
+    for (let dx = -searchRadius; dx <= searchRadius; dx += 8) {
+      for (let dz = -searchRadius; dz <= searchRadius; dz += 8) {
+        const bx = cand.x + dx;
+        const bz = cand.z + dz;
+        const bid = cubiomesModule.ccall('get_single_biome', 'number', ['number', 'number', 'number'], [bx, bz, selectedY]);
+        if (bid === targetBiomeId) {
+          const d = Math.hypot(bx - fromX, bz - fromZ);
+          if (d < actualMinD) {
+            actualMinD = d;
+            actualBest = { x: bx, z: bz, distance: Math.round(d) };
+          }
+        }
+      }
+    }
+  }
+
+  // Phase 2: fine 4-block steps (native Minecraft quart scale) around the best candidate or cand
+  const center = actualBest || cand;
+  const fineRadius = Math.min(48, Math.max(24, scale));
+  for (let dx = -fineRadius; dx <= fineRadius; dx += 4) {
+    for (let dz = -fineRadius; dz <= fineRadius; dz += 4) {
+      const bx = center.x + dx;
+      const bz = center.z + dz;
+      const bid = cubiomesModule.ccall('get_single_biome', 'number', ['number', 'number', 'number'], [bx, bz, selectedY]);
+      if (bid === targetBiomeId) {
+        const d = Math.hypot(bx - fromX, bz - fromZ);
+        if (d < actualMinD) {
+          actualMinD = d;
+          actualBest = { x: bx, z: bz, distance: Math.round(d) };
+        }
+      }
+    }
+  }
+
+  return actualBest || cand;
+}
+
+/**
+ * Rapidly and accurately finds the closest point to targetBiomeId from (fromX, fromZ) using Cubiomes WASM.
+ * Uses a multi-stage concentric hierarchical search:
+ * - Stage 1: Scale 16, centered at (fromX, fromZ) covering 4,096 x 4,096 blocks (inscribed radius 2,048 blocks).
+ *            Detects micro-patches (e.g. Cherry Grove, Pale Garden) without skipping.
+ * - Stage 2: Scale 32, ring of 8 surrounding boxes covering 12,288 x 12,288 blocks (inscribed radius 6,144 blocks).
+ * - Stage 3: Scale 64, ring of 16 outer boxes covering up to 24,000 blocks radius.
+ * - Stage 4: Scale 128, ring of 24 boxes covering up to 48,000 blocks radius.
+ * - Refinement: Pinpoints the exact closest edge using 4-block native Minecraft quart resolution.
+ */
+export function findClosestBiome({
+  targetBiomeId,
+  fromX,
+  fromZ,
+  selectedY = 319,
+  cubiomesModule,
+  sharedBufferPtr
+}) {
+  if (!cubiomesModule || !sharedBufferPtr) return null;
+
+  // 1. Direct origin test
+  try {
+    const originBiome = cubiomesModule.ccall(
+      'get_single_biome',
+      'number',
+      ['number', 'number', 'number'],
+      [fromX, fromZ, selectedY]
+    );
+    if (originBiome === targetBiomeId) {
+      return { x: fromX, z: fromZ, distance: 0 };
+    }
+  } catch (_) {}
+
+  const heap32 = cubiomesModule.HEAP32;
+  const offset = sharedBufferPtr >> 2;
+
+  let bestCand = null;
+  let minCandDist = Infinity;
+  let bestScale = 16;
+
+  // -----------------------------------------------------------------
+  // Stage 1: Near-Field High Precision (0 to 2,048 blocks radius)
+  // 256x256 samples at scale = 16 (4,096 x 4,096 blocks centered at fromX, fromZ)
+  // Inscribed circle radius = 2,048 blocks
+  // -----------------------------------------------------------------
+  {
+    const W = 256;
+    const H = 256;
+    const scale = 16;
+    const halfSpan = (W / 2) * scale; // 2048 blocks
+    const rX = Math.round((fromX - halfSpan) / scale);
+    const rZ = Math.round((fromZ - halfSpan) / scale);
+
+    try {
+      cubiomesModule._get_biome_area(sharedBufferPtr, rX, rZ, W, H, scale, selectedY);
+
+      for (let row = 0; row < H; row++) {
+        const rowOffset = offset + row * W;
+        for (let col = 0; col < W; col++) {
+          const bId = heap32 ? heap32[rowOffset + col] : cubiomesModule.getValue(sharedBufferPtr + (row * W + col) * 4, 'i32');
+          if (bId === targetBiomeId) {
+            const bx = (rX + col) * scale;
+            const bz = (rZ + row) * scale;
+            const d = Math.hypot(bx - fromX, bz - fromZ);
+            if (d < minCandDist) {
+              minCandDist = d;
+              bestCand = { x: bx, z: bz, distance: Math.round(d) };
+              bestScale = scale;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    // If candidate found within the fully-searched 2,048-block inscribed circle,
+    // no closer point can exist anywhere in the world!
+    if (bestCand && bestCand.distance <= 2048) {
+      return refineToClosestBiome(bestCand, targetBiomeId, fromX, fromZ, selectedY, cubiomesModule, bestScale);
+    }
+  }
+
+  // -----------------------------------------------------------------
+  // Stage 2: Mid-Range (2,048 to 6,144 blocks radius)
+  // Ring of 8 surrounding boxes at scale = 32 (128x128 samples = 4,096 x 4,096 blocks each)
+  // Covers 12,288 x 12,288 blocks centered at fromX, fromZ (inscribed radius 6,144 blocks)
+  // -----------------------------------------------------------------
+  {
+    const W = 128;
+    const H = 128;
+    const scale = 32;
+    const boxSize = W * scale; // 4096 blocks
+    const ring1 = [
+      [-1, -1], [0, -1], [1, -1],
+      [-1,  0],          [1,  0],
+      [-1,  1], [0,  1], [1,  1]
+    ];
+
+    for (const [gx, gz] of ring1) {
+      const boxCenterX = fromX + gx * boxSize;
+      const boxCenterZ = fromZ + gz * boxSize;
+      const rX = Math.round((boxCenterX - boxSize / 2) / scale);
+      const rZ = Math.round((boxCenterZ - boxSize / 2) / scale);
+
+      try {
+        cubiomesModule._get_biome_area(sharedBufferPtr, rX, rZ, W, H, scale, selectedY);
+
+        for (let row = 0; row < H; row++) {
+          const rowOffset = offset + row * W;
+          for (let col = 0; col < W; col++) {
+            const bId = heap32 ? heap32[rowOffset + col] : cubiomesModule.getValue(sharedBufferPtr + (row * W + col) * 4, 'i32');
+            if (bId === targetBiomeId) {
+              const bx = (rX + col) * scale;
+              const bz = (rZ + row) * scale;
+              const d = Math.hypot(bx - fromX, bz - fromZ);
+              if (d < minCandDist) {
+                minCandDist = d;
+                bestCand = { x: bx, z: bz, distance: Math.round(d) };
+                bestScale = scale;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (bestCand && bestCand.distance <= 6144) {
+      return refineToClosestBiome(bestCand, targetBiomeId, fromX, fromZ, selectedY, cubiomesModule, bestScale);
+    }
+  }
+
+  // -----------------------------------------------------------------
+  // Stage 3: Far-Range (6,144 to 20,480 blocks radius)
+  // Ring of 16 outer boxes at scale = 64 (128x128 samples = 8,192 x 8,192 blocks each)
+  // Inscribed radius = 20,480 blocks
+  // -----------------------------------------------------------------
+  {
+    const W = 128;
+    const H = 128;
+    const scale = 64;
+    const boxSize = W * scale; // 8192 blocks
+    const ring2 = [
+      [-2, -2], [-1, -2], [0, -2], [1, -2], [2, -2],
+      [-2, -1],                             [2, -1],
+      [-2,  0],                             [2,  0],
+      [-2,  1],                             [2,  1],
+      [-2,  2], [-1,  2], [0,  2], [1,  2], [2,  2]
+    ];
+
+    for (const [gx, gz] of ring2) {
+      const boxCenterX = fromX + gx * boxSize;
+      const boxCenterZ = fromZ + gz * boxSize;
+      const rX = Math.round((boxCenterX - boxSize / 2) / scale);
+      const rZ = Math.round((boxCenterZ - boxSize / 2) / scale);
+
+      try {
+        cubiomesModule._get_biome_area(sharedBufferPtr, rX, rZ, W, H, scale, selectedY);
+
+        for (let row = 0; row < H; row++) {
+          const rowOffset = offset + row * W;
+          for (let col = 0; col < W; col++) {
+            const bId = heap32 ? heap32[rowOffset + col] : cubiomesModule.getValue(sharedBufferPtr + (row * W + col) * 4, 'i32');
+            if (bId === targetBiomeId) {
+              const bx = (rX + col) * scale;
+              const bz = (rZ + row) * scale;
+              const d = Math.hypot(bx - fromX, bz - fromZ);
+              if (d < minCandDist) {
+                minCandDist = d;
+                bestCand = { x: bx, z: bz, distance: Math.round(d) };
+                bestScale = scale;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (bestCand && bestCand.distance <= 20480) {
+      return refineToClosestBiome(bestCand, targetBiomeId, fromX, fromZ, selectedY, cubiomesModule, bestScale);
+    }
+  }
+
+  // -----------------------------------------------------------------
+  // Stage 4: Extreme-Range (up to 48,000 blocks)
+  // Ring of 24 boxes at scale = 128 (128x128 samples = 16,384 x 16,384 blocks each)
+  // -----------------------------------------------------------------
+  {
+    const W = 128;
+    const H = 128;
+    const scale = 128;
+    const boxSize = W * scale; // 16,384 blocks
+    const ring3 = [
+      [-2, -2], [-1, -2], [0, -2], [1, -2], [2, -2],
+      [-2, -1],                             [2, -1],
+      [-2,  0],                             [2,  0],
+      [-2,  1],                             [2,  1],
+      [-2,  2], [-1,  2], [0,  2], [1,  2], [2,  2]
+    ];
+
+    for (const [gx, gz] of ring3) {
+      const boxCenterX = fromX + gx * boxSize;
+      const boxCenterZ = fromZ + gz * boxSize;
+      const rX = Math.round((boxCenterX - boxSize / 2) / scale);
+      const rZ = Math.round((boxCenterZ - boxSize / 2) / scale);
+
+      try {
+        cubiomesModule._get_biome_area(sharedBufferPtr, rX, rZ, W, H, scale, selectedY);
+
+        for (let row = 0; row < H; row++) {
+          const rowOffset = offset + row * W;
+          for (let col = 0; col < W; col++) {
+            const bId = heap32 ? heap32[rowOffset + col] : cubiomesModule.getValue(sharedBufferPtr + (row * W + col) * 4, 'i32');
+            if (bId === targetBiomeId) {
+              const bx = (rX + col) * scale;
+              const bz = (rZ + row) * scale;
+              const d = Math.hypot(bx - fromX, bz - fromZ);
+              if (d < minCandDist) {
+                minCandDist = d;
+                bestCand = { x: bx, z: bz, distance: Math.round(d) };
+                bestScale = scale;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
+  if (bestCand) {
+    return refineToClosestBiome(bestCand, targetBiomeId, fromX, fromZ, selectedY, cubiomesModule, bestScale);
+  }
+
+  return null;
 }

@@ -19,6 +19,7 @@ self.addEventListener('message', async (event) => {
     }
   } else if (action === 'getPois') {
     try {
+      await pg();
       const { world, features, minChunkX, minChunkZ, sizeX, sizeZ } = payload;
       const pois = await kd(world, features, minChunkX, minChunkZ, sizeX, sizeZ);
       self.postMessage({ id, pois });

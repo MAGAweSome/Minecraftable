@@ -11,36 +11,43 @@
     
     #toolbar {
       min-height: 48px;
-      padding: 6px 16px;
+      padding: 6px 14px;
       background: #1e1e1e;
       display: flex;
-      gap: 14px;
+      gap: 10px;
       align-items: center;
       z-index: 100;
       border-bottom: 1px solid #333;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
     }
     #toolbar label {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       font-size: 13px;
       color: #eee;
+      white-space: nowrap;
     }
     #toolbar input, #toolbar select, #toolbar button {
-      padding: 6px 10px;
+      padding: 6px 9px;
       border-radius: 4px;
       border: 1px solid #444;
       background: #2b2b2b;
       color: #fff;
       font-size: 13px;
+      white-space: nowrap;
     }
-    .coord-input { width: 80px; }
+    #seedInput { width: 175px; }
+    #versionSelect { max-width: 165px; }
+    .coord-input { width: 68px; }
     #gotoBtn { background: #1f6feb; border-color: #388bfd; font-weight: bold; cursor: pointer; }
     #gotoBtn:hover { background: #388bfd; }
-    #clearPinBtn { background: #444; border-color: #555; cursor: pointer; }
+    #clearPinBtn { background: #3a3a3a; border-color: #4a4a4a; cursor: pointer; }
+    #clearPinBtn:hover { background: #4a4a4a; }
+    #addPinBtn { background: #238636; border-color: #2ea043; font-weight: 600; cursor: pointer; }
+    #addPinBtn:hover { background: #2ea043; }
 
-    .separator { width: 1px; height: 24px; background: #444; margin: 0 4px; }
+    .separator { width: 1px; height: 22px; background: #444; margin: 0 3px; flex-shrink: 0; }
 
     #container {
       position: relative;
@@ -49,6 +56,7 @@
       height: 100%;
       cursor: grab;
       touch-action: none;
+      overflow: hidden;
     }
     #container:active { cursor: grabbing; }
 
@@ -97,10 +105,14 @@
       display: flex;
       flex-direction: column;
       transform: translateX(100%);
-      transition: transform 0.22s ease-in-out;
+      transition: transform 0.22s ease-in-out, visibility 0.22s;
+      visibility: hidden;
+      pointer-events: none;
     }
     #featuresPanel.open {
       transform: translateX(0);
+      visibility: visible;
+      pointer-events: auto;
     }
     .features-header {
       display: flex;
@@ -184,6 +196,467 @@
       height: 16px;
       accent-color: #1f6feb;
       cursor: pointer;
+    }
+
+    /* Highlight Biomes Dropdown & Toolbar Button */
+    .highlight-container {
+      position: relative;
+      display: inline-block;
+    }
+    .highlight-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: #2b2b2b;
+      border: 1px solid #444;
+      color: #eee;
+      border-radius: 4px;
+      padding: 6px 11px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .highlight-btn:hover {
+      background: #333;
+      border-color: #555;
+    }
+    .highlight-btn.active {
+      background: #19385c;
+      border-color: #1f6feb;
+      color: #79c0ff;
+    }
+    .highlight-badge {
+      background: #1f6feb;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 10px;
+      margin-left: 2px;
+    }
+    .highlight-badge.hidden {
+      display: none;
+    }
+    .highlight-clear-btn {
+      background: none;
+      border: none;
+      color: #aaa;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 1px 4px;
+      border-radius: 50%;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .highlight-clear-btn:hover {
+      color: #ff7b72;
+      background: rgba(255, 123, 114, 0.15);
+    }
+    .highlight-clear-btn.hidden {
+      display: none;
+    }
+
+    .highlight-dropdown {
+      position: absolute;
+      top: calc(100% + 7px);
+      left: 0;
+      width: 320px;
+      background: #ffffff;
+      color: #1f2328;
+      border-radius: 9px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
+      border: 1px solid #d0d7de;
+      z-index: 250;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: fadeInDropdown 0.15s ease-out;
+    }
+    .highlight-dropdown.hidden {
+      display: none;
+    }
+    @keyframes fadeInDropdown {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .dropdown-tabs {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 14px 8px;
+      background: #f6f8fa;
+      border-bottom: 1px solid #d8dee4;
+    }
+    .tab-btn {
+      flex: 1;
+      text-align: center;
+      padding: 5px 12px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #57606a;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tab-btn:hover {
+      color: #24292f;
+      background: #eaeef2;
+    }
+    .tab-btn.active {
+      background: #ffffff;
+      color: #0969da;
+      font-weight: 600;
+      border-color: #d0d7de;
+      box-shadow: 0 1px 3px rgba(31, 35, 40, 0.12);
+    }
+    .dropdown-search-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-bottom: 1px solid #eaecef;
+      background: #ffffff;
+    }
+    .dropdown-search-box svg {
+      color: #8c959f;
+      flex-shrink: 0;
+    }
+    .dropdown-search-box input {
+      flex: 1;
+      border: none !important;
+      outline: none !important;
+      background: transparent !important;
+      font-size: 13px !important;
+      color: #24292f !important;
+      padding: 3px 0 !important;
+    }
+    .dropdown-search-box input::placeholder {
+      color: #8c959f;
+    }
+    .search-clear-btn {
+      background: none;
+      border: none;
+      color: #8c959f;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 5px;
+      line-height: 1;
+    }
+    .search-clear-btn:hover {
+      color: #24292f;
+    }
+    .search-clear-btn.hidden {
+      display: none;
+    }
+    .dropdown-list {
+      max-height: 380px;
+      overflow-y: auto;
+      padding: 6px 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      background: #ffffff;
+    }
+    .dropdown-category-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #8c959f;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      padding: 8px 8px 3px;
+      margin-top: 4px;
+    }
+    .dropdown-category-title:first-child {
+      margin-top: 0;
+    }
+    .biome-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.12s;
+      user-select: none;
+    }
+    .biome-item:hover {
+      background: #f3f4f6;
+    }
+    .biome-item.selected {
+      background: #ebf5ff;
+      color: #0969da;
+      font-weight: 600;
+    }
+    .biome-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      border: 1px solid rgba(0, 0, 0, 0.2);
+      flex-shrink: 0;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .biome-name {
+      flex: 1;
+      font-size: 13px;
+      color: #24292f;
+    }
+    .biome-item.selected .biome-name {
+      color: #0969da;
+      font-weight: 600;
+    }
+    .biome-check {
+      font-size: 13px;
+      font-weight: bold;
+      color: #0969da;
+      display: none;
+    }
+    .biome-item.selected .biome-check {
+      display: inline-block;
+    }
+
+    /* Groups list in dropdown */
+    .group-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .group-item:hover {
+      background: #f3f4f6;
+    }
+    .group-item.selected {
+      background: #ebf5ff;
+    }
+    .group-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #24292f;
+    }
+    .group-count {
+      font-size: 11px;
+      color: #656d76;
+    }
+    .group-checkbox {
+      width: 16px;
+      height: 16px;
+      accent-color: #0969da;
+      cursor: pointer;
+    }
+
+    /* Pins Side Panel & Custom Coordinates */
+    #pinsPanel {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 320px;
+      height: 100%;
+      background: #1c1c1c;
+      border-left: 1px solid #333;
+      box-shadow: -4px 0 16px rgba(0,0,0,0.5);
+      z-index: 150;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.22s ease-in-out, visibility 0.22s;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    #pinsPanel.open {
+      transform: translateX(0);
+      visibility: visible;
+      pointer-events: auto;
+    }
+    .pins-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid #333;
+      background: #252525;
+    }
+    .pins-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .pins-seed-notice {
+      padding: 6px 16px;
+      font-size: 11px;
+      color: #888;
+      background: #202020;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .pin-form-container {
+      padding: 12px 16px;
+      border-bottom: 1px solid #333;
+      background: #232323;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .pin-form-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #aaa;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .pin-input {
+      width: 100%;
+      padding: 6px 10px;
+      background: #2b2b2b;
+      border: 1px solid #444;
+      border-radius: 4px;
+      color: #fff;
+      font-size: 13px;
+    }
+    .pin-coords-row {
+      display: flex;
+      gap: 6px;
+    }
+    .pin-coords-row input {
+      flex: 1;
+      padding: 6px 8px;
+      background: #2b2b2b;
+      border: 1px solid #444;
+      border-radius: 4px;
+      color: #fff;
+      font-size: 12px;
+      min-width: 0;
+    }
+    .pin-color-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .pin-color-label {
+      font-size: 12px;
+      color: #888;
+    }
+    .pin-color-options {
+      display: flex;
+      gap: 8px;
+    }
+    .pin-color-dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .pin-color-dot:hover {
+      transform: scale(1.15);
+    }
+    .pin-color-dot.active {
+      border-color: #ffffff;
+      transform: scale(1.15);
+      box-shadow: 0 0 6px rgba(255,255,255,0.4);
+    }
+    .pin-save-btn {
+      background: #238636;
+      border: 1px solid #2ea043;
+      color: #ffffff;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background 0.15s;
+    }
+    .pin-save-btn:hover {
+      background: #2ea043;
+    }
+    .pins-list-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .pin-empty-state {
+      color: #777;
+      font-size: 12px;
+      text-align: center;
+      padding: 30px 10px;
+      line-height: 1.6;
+    }
+    .pin-card {
+      background: #262626;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      border-left-width: 4px;
+      transition: border-color 0.15s;
+    }
+    .pin-card:hover {
+      border-color: #555;
+    }
+    .pin-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .pin-card-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .pin-card-dim {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #333;
+      color: #aaa;
+      text-transform: uppercase;
+    }
+    .pin-card-coords {
+      font-size: 12px;
+      font-family: monospace;
+      color: #aaa;
+    }
+    .pin-card-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 2px;
+    }
+    .pin-action-btn {
+      flex: 1;
+      padding: 4px 8px;
+      font-size: 11px;
+      background: #333;
+      border: 1px solid #444;
+      color: #ddd;
+      border-radius: 4px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+    }
+    .pin-action-btn:hover {
+      background: #1f6feb;
+      border-color: #1f6feb;
+      color: #fff;
+    }
+    .pin-delete-btn:hover {
+      background: #da3633 !important;
+      border-color: #da3633 !important;
+      color: #fff !important;
     }
 
     /* Marker Click Popup Card (Chunkbase style) */
@@ -328,6 +801,329 @@
       border-top: none;
       border-bottom: 7px solid #ffffff;
     }
+
+    /* Find Closest Dropdown */
+    .find-container {
+      position: relative;
+      display: inline-block;
+    }
+    .find-dropdown {
+      position: absolute;
+      top: calc(100% + 7px);
+      right: 0;
+      width: 350px;
+      background: #1c1c1c;
+      color: #eee;
+      border-radius: 8px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.3);
+      border: 1px solid #388bfd;
+      z-index: 250;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: fadeInDropdown 0.15s ease-out;
+    }
+    .find-dropdown.hidden {
+      display: none;
+    }
+    .find-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: #252525;
+      border-bottom: 1px solid #333;
+    }
+    .find-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #fff;
+    }
+    .find-close-btn {
+      background: none;
+      border: none;
+      color: #888;
+      font-size: 15px;
+      cursor: pointer;
+      padding: 2px 6px;
+    }
+    .find-close-btn:hover {
+      color: #fff;
+    }
+    .find-origin-section {
+      padding: 10px 14px;
+      background: #202020;
+      border-bottom: 1px solid #2e2e2e;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .find-origin-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #888;
+      font-weight: 600;
+    }
+    .find-origin-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .find-origin-row label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #bbb;
+    }
+    .find-coord-input {
+      width: 90px;
+      background: #2b2b2b;
+      border: 1px solid #444;
+      color: #fff;
+      padding: 4px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .find-coord-input:focus {
+      outline: none;
+      border-color: #388bfd;
+    }
+    .find-quick-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 2px;
+    }
+    .find-quick-btn {
+      flex: 1;
+      padding: 4px 8px;
+      background: #2b2b2b;
+      border: 1px solid #444;
+      color: #bbb;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .find-quick-btn:hover {
+      background: #388bfd;
+      border-color: #388bfd;
+      color: #fff;
+    }
+    .find-tabs {
+      display: flex;
+      background: #242424;
+      border-bottom: 1px solid #333;
+      padding: 6px 10px;
+      gap: 6px;
+    }
+    .find-tab-btn {
+      flex: 1;
+      padding: 5px 8px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #888;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .find-tab-btn:hover {
+      color: #ddd;
+      background: #2c2c2c;
+    }
+    .find-tab-btn.active {
+      background: #1f6feb;
+      color: #fff;
+      font-weight: 600;
+    }
+    .find-search-box {
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      background: #191919;
+      border-bottom: 1px solid #2e2e2e;
+      position: relative;
+    }
+    .find-search-box input {
+      width: 100%;
+      background: #262626;
+      border: 1px solid #444;
+      color: #eee;
+      border-radius: 4px;
+      padding: 6px 26px 6px 8px;
+      font-size: 12px;
+    }
+    .find-search-box input:focus {
+      outline: none;
+      border-color: #388bfd;
+    }
+    .find-search-clear {
+      position: absolute;
+      right: 18px;
+      background: none;
+      border: none;
+      color: #888;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .find-search-clear:hover {
+      color: #fff;
+    }
+    .find-list {
+      max-height: 230px;
+      overflow-y: auto;
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .find-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .find-item:hover {
+      background: #2c2c2c;
+    }
+    .find-item-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      flex-shrink: 0;
+    }
+    .find-item-icon {
+      width: 20px;
+      height: 20px;
+      background-image: url('/chunk-finders-tn.webp');
+      background-repeat: no-repeat;
+      flex-shrink: 0;
+    }
+    .find-item-name {
+      flex: 1;
+      font-size: 13px;
+      color: #ddd;
+    }
+    .find-item-arrow {
+      font-size: 12px;
+      color: #388bfd;
+      opacity: 0.7;
+    }
+    .find-item:hover .find-item-arrow {
+      opacity: 1;
+      transform: translateX(2px);
+    }
+    .find-empty {
+      padding: 24px 12px;
+      text-align: center;
+      color: #888;
+      font-size: 12px;
+    }
+    .find-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 24px 12px;
+      color: #aaa;
+      font-size: 13px;
+    }
+    .find-loading.hidden {
+      display: none;
+    }
+    .find-spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid #333;
+      border-top-color: #388bfd;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    .find-result-card {
+      padding: 14px;
+      background: #222;
+      border-top: 1px solid #333;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .find-result-card.hidden {
+      display: none;
+    }
+    .find-result-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .find-result-icon {
+      font-size: 18px;
+    }
+    .find-result-title {
+      font-size: 15px;
+      font-weight: bold;
+      color: #fff;
+    }
+    .find-result-coords {
+      font-family: monospace;
+      font-size: 13px;
+      font-weight: bold;
+      color: #58a6ff;
+      background: #191919;
+      padding: 5px 8px;
+      border-radius: 4px;
+      border: 1px solid #333;
+    }
+    .find-result-meta {
+      font-size: 12px;
+      color: #7ee787;
+      font-weight: 500;
+    }
+    .find-result-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .find-btn-primary {
+      flex: 1.3;
+      padding: 7px 10px;
+      background: #238636;
+      border: 1px solid #2ea043;
+      color: #fff;
+      font-weight: bold;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .find-btn-primary:hover {
+      background: #2ea043;
+      box-shadow: 0 0 10px rgba(46, 160, 67, 0.4);
+    }
+    .find-btn-secondary {
+      flex: 1;
+      padding: 7px 8px;
+      background: #2b2b2b;
+      border: 1px solid #444;
+      color: #ccc;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .find-btn-secondary:hover {
+      background: #388bfd;
+      border-color: #388bfd;
+      color: #fff;
+    }
   </style>
 </head>
 <body>
@@ -433,15 +1229,112 @@
       </select>
     </label>
 
+    <div class="highlight-container" id="highlightBiomesContainer">
+      <button id="highlightBiomesBtn" class="highlight-btn" title="Highlight Biomes">
+        <span>Highlight Biomes</span>
+        <span id="highlightBadge" class="highlight-badge hidden">0</span>
+        <button id="highlightClearBtn" class="highlight-clear-btn hidden" title="Clear highlighted biomes">✕</button>
+      </button>
+
+      <!-- Chunkbase-style Dropdown -->
+      <div id="highlightDropdown" class="highlight-dropdown hidden">
+        <div class="dropdown-tabs">
+          <button id="tabBiomesBtn" class="tab-btn active">Biomes</button>
+          <button id="tabGroupsBtn" class="tab-btn">Groups</button>
+        </div>
+        <div class="dropdown-search-box">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="biomeSearchInput" placeholder="Search..." autocomplete="off" />
+          <button id="clearSearchBtn" class="search-clear-btn hidden" title="Clear search">✕</button>
+        </div>
+        <div id="biomeDropdownList" class="dropdown-list">
+          <!-- Dynamic biome or group items -->
+        </div>
+      </div>
+    </div>
+
     <div class="separator"></div>
 
     <label><span>X:</span><input type="number" id="gotoX" class="coord-input" placeholder="0" /></label>
     <label><span>Z:</span><input type="number" id="gotoZ" class="coord-input" placeholder="0" /></label>
     <button id="gotoBtn">Go!</button>
     <button id="clearPinBtn">Clear</button>
+    <button id="addPinBtn" title="Save current coordinates as custom pin">+ Pin</button>
 
     <div style="margin-left: auto; display: inline-flex; align-items: center; gap: 10px;">
       <div id="zoomNoticeBadge" class="zoom-notice hidden">⚠️ Zoom in to show all selected features</div>
+
+      <!-- Find Closest Section -->
+      <div class="find-container" style="position: relative;">
+        <button id="findToggleBtn" style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+          <span>🔍 Find</span>
+        </button>
+
+        <div id="findDropdown" class="find-dropdown hidden">
+          <div class="find-header">
+            <div class="find-title">🔍 Find Closest</div>
+            <button id="findCloseBtn" class="find-close-btn" title="Close">✕</button>
+          </div>
+
+          <!-- Origin Coordinates section -->
+          <div class="find-origin-section">
+            <div class="find-origin-label">From Coordinates:</div>
+            <div class="find-origin-row">
+              <label>X: <input type="number" id="findOriginX" class="find-coord-input" value="0" /></label>
+              <label>Z: <input type="number" id="findOriginZ" class="find-coord-input" value="0" /></label>
+            </div>
+            <div class="find-quick-row">
+              <button id="findUseCurrentBtn" class="find-quick-btn" title="Use current map center coordinates">📍 Current View</button>
+              <button id="findUseSpawnBtn" class="find-quick-btn" title="Use world spawn (0, 0)">🏠 Spawn (0, 0)</button>
+            </div>
+          </div>
+
+          <!-- Category Tabs -->
+          <div class="find-tabs">
+            <button class="find-tab-btn active" data-tab="biomes">🌲 Biomes</button>
+            <button class="find-tab-btn" data-tab="features">🏛️ Features</button>
+            <button class="find-tab-btn" data-tab="pins">📍 Saved Places</button>
+          </div>
+
+          <!-- Search input -->
+          <div class="find-search-box">
+            <input type="text" id="findSearchInput" placeholder="Search biomes (e.g. desert, plains)..." />
+            <button id="findClearSearchBtn" class="find-search-clear hidden">✕</button>
+          </div>
+
+          <!-- Items list -->
+          <div id="findList" class="find-list"></div>
+
+          <!-- Loading indicator -->
+          <div id="findLoading" class="find-loading hidden">
+            <div class="find-spinner"></div>
+            <div id="findLoadingText">Locating closest...</div>
+          </div>
+
+          <!-- Result card -->
+          <div id="findResultCard" class="find-result-card hidden">
+            <div class="find-result-header">
+              <span id="findResultIcon" class="find-result-icon">📍</span>
+              <span id="findResultTitle" class="find-result-title">Desert</span>
+            </div>
+            <div class="find-result-coords" id="findResultCoords">X: 432 | Z: -1280</div>
+            <div class="find-result-meta" id="findResultMeta">1,351 blocks Northeast ↗</div>
+            <div class="find-result-actions">
+              <button id="findAwayWeGoBtn" class="find-btn-primary">🚀 Away We Go!</button>
+              <button id="findCopyTpBtn" class="find-btn-secondary">📋 Copy /tp</button>
+              <button id="findBackBtn" class="find-btn-secondary">← Back to List</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button id="pinsToggleBtn" style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+        <span>📍 Pins</span>
+        <span id="pinsCountBadge" style="background:#238636; border-radius:10px; padding:1px 6px; font-size:11px; font-weight:bold;">0</span>
+      </button>
       <button id="featuresToggleBtn" style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
         <span>☰ Features</span>
         <span id="featuresCountBadge" style="background:#1f6feb; border-radius:10px; padding:1px 6px; font-size:11px; font-weight:bold;">0</span>
@@ -464,6 +1357,41 @@
       </div>
       <div id="featuresList" class="features-list">
         <!-- Dynamic feature checkboxes -->
+      </div>
+    </aside>
+
+    <!-- Side Panel for Saved Custom Pins -->
+    <aside id="pinsPanel">
+      <div class="pins-header">
+        <div class="pins-title">
+          <span>📍 Saved Pins</span>
+        </div>
+        <button id="pinsCloseBtn" class="features-close-btn" title="Close Panel">✕</button>
+      </div>
+      <div id="pinsSeedNotice" class="pins-seed-notice">Seed: -7537587231326715432</div>
+      <div class="pin-form-container">
+        <div class="pin-form-title">+ Add New Pin</div>
+        <input type="text" id="pinNameInput" class="pin-input" placeholder="Pin Name (e.g. Main Base, Portal)" />
+        <div class="pin-coords-row">
+          <input type="number" id="pinXInput" placeholder="X" />
+          <input type="number" id="pinYInput" placeholder="Y (opt)" />
+          <input type="number" id="pinZInput" placeholder="Z" />
+        </div>
+        <div class="pin-color-row">
+          <span class="pin-color-label">Color:</span>
+          <div class="pin-color-options">
+            <div class="pin-color-dot active" data-color="#ff4757" style="background: #ff4757;"></div>
+            <div class="pin-color-dot" data-color="#2ed573" style="background: #2ed573;"></div>
+            <div class="pin-color-dot" data-color="#1e90ff" style="background: #1e90ff;"></div>
+            <div class="pin-color-dot" data-color="#ffa502" style="background: #ffa502;"></div>
+            <div class="pin-color-dot" data-color="#a55eea" style="background: #a55eea;"></div>
+            <div class="pin-color-dot" data-color="#00d2d3" style="background: #00d2d3;"></div>
+          </div>
+        </div>
+        <button id="savePinBtn" class="pin-save-btn">Save Pin to Seed</button>
+      </div>
+      <div id="pinsList" class="pins-list-container">
+        <!-- Dynamic pin cards -->
       </div>
     </aside>
 
